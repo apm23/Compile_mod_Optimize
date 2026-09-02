@@ -45,8 +45,8 @@ public final class CustomHotbarInventory implements ModInitializer {
         ServerPlayNetworking.registerGlobalReceiver(ModPayloads.BrowseClose.TYPE,(payload,context)->InventoryStorage.setBrowsing(context.player(),false));
         ServerPlayNetworking.registerGlobalReceiver(ModPayloads.CyclePage.TYPE,(payload,context)->{ServerPlayer p=context.player();if(canSwitchPages(p)){InventoryStorage.cycle(p);sendPageState(p);sendHiddenRecipeState(p);}});
         ServerPlayNetworking.registerGlobalReceiver(ModPayloads.SwapHotbar.TYPE,(payload,context)->swapHotbar(context.player()));
-        ServerPlayNetworking.registerGlobalReceiver(ModPayloads.SortAll.TYPE,(payload,context)->{ServerPlayer p=context.player();if(canReorganizePages(p)){InventoryAlgorithms.sortAll(p);sendHiddenRecipeState(p);}});
-        ServerPlayNetworking.registerGlobalReceiver(ModPayloads.MergeAll.TYPE,(payload,context)->{ServerPlayer p=context.player();if(canReorganizePages(p)){InventoryAlgorithms.mergeAll(p);sendHiddenRecipeState(p);}});
+        ServerPlayNetworking.registerGlobalReceiver(ModPayloads.SortAll.TYPE,(payload,context)->{ServerPlayer p=context.player();if(canReorganizePages(p)){InventoryAlgorithms.sortAll(p);sendPageState(p);sendHiddenRecipeState(p);}});
+        ServerPlayNetworking.registerGlobalReceiver(ModPayloads.MergeAll.TYPE,(payload,context)->{ServerPlayer p=context.player();if(canReorganizePages(p)){InventoryAlgorithms.mergeAll(p);sendPageState(p);sendHiddenRecipeState(p);}});
         ServerPlayNetworking.registerGlobalReceiver(ModPayloads.DirectPage.P1.TYPE,(payload,context)->direct(context.player(),0));ServerPlayNetworking.registerGlobalReceiver(ModPayloads.DirectPage.P2.TYPE,(payload,context)->direct(context.player(),1));ServerPlayNetworking.registerGlobalReceiver(ModPayloads.DirectPage.P3.TYPE,(payload,context)->direct(context.player(),2));ServerPlayNetworking.registerGlobalReceiver(ModPayloads.DirectPage.P4.TYPE,(payload,context)->direct(context.player(),3));ServerPlayNetworking.registerGlobalReceiver(ModPayloads.DirectPage.P5.TYPE,(payload,context)->direct(context.player(),4));ServerPlayNetworking.registerGlobalReceiver(ModPayloads.DirectPage.P6.TYPE,(payload,context)->direct(context.player(),5));ServerPlayNetworking.registerGlobalReceiver(ModPayloads.DirectPage.P7.TYPE,(payload,context)->direct(context.player(),6));ServerPlayNetworking.registerGlobalReceiver(ModPayloads.DirectPage.P8.TYPE,(payload,context)->direct(context.player(),7));
     }
 
@@ -59,8 +59,8 @@ public final class CustomHotbarInventory implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(server->{for(ServerPlayer p:server.getPlayerList().getPlayers()){int before=InventoryStorage.active(p);InventoryStorage.routeOverflow(p);if(before!=InventoryStorage.active(p)){sendPageState(p);sendHiddenRecipeState(p);}}});
     }
 
-    private static boolean canSwitchPages(ServerPlayer p){return InventoryStorage.isBrowsing(p);}
-    private static boolean canReorganizePages(ServerPlayer p){return InventoryStorage.isBrowsing(p)&&p.containerMenu.getCarried().isEmpty();}
+    private static boolean canSwitchPages(ServerPlayer p){return InventoryStorage.isBrowsing(p)||p.containerMenu==p.inventoryMenu;}
+    private static boolean canReorganizePages(ServerPlayer p){return canSwitchPages(p)&&p.containerMenu.getCarried().isEmpty();}
     private static void direct(ServerPlayer p,int page){if(canSwitchPages(p)){InventoryStorage.switchPage(p,page);sendPageState(p);sendHiddenRecipeState(p);}}
     private static void sendPageState(ServerPlayer p){if(ServerPlayNetworking.canSend(p,ModPayloads.PageState.TYPE))ServerPlayNetworking.send(p,new ModPayloads.PageState(InventoryStorage.active(p)));}
     public static void sendHiddenRecipeState(ServerPlayer p){if(!ServerPlayNetworking.canSend(p,ModPayloads.HiddenRecipeContents.TYPE))return;int active=InventoryStorage.active(p);ArrayList<ItemStack> hidden=new ArrayList<>((InventoryStorage.PAGE_COUNT-1)*InventoryStorage.PAGE_SIZE);for(int page=0;page<InventoryStorage.PAGE_COUNT;page++)if(page!=active)for(ItemStack stack:InventoryStorage.read(p,page))hidden.add(stack.copy());ServerPlayNetworking.send(p,new ModPayloads.HiddenRecipeContents(hidden));}
