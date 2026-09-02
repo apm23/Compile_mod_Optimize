@@ -10,7 +10,8 @@
     "main": [
       "com.anjas.linkedshulker.LinkedShulkerMod",
       "com.anjas.fuelrecipe.FuelRecipeMod",
-      "com.anjas.forceanvil.ForceAnvilMod"
+      "com.anjas.forceanvil.ForceAnvilMod",
+      "com.anjas.custominventory.CustomHotbarInventory"
     ]
   },
   "mixins": ["fuelrecipe.mixins.json", "forceanvil.mixins.json"],
