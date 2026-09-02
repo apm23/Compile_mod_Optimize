@@ -12,6 +12,9 @@
       "com.anjas.fuelrecipe.FuelRecipeMod",
       "com.anjas.forceanvil.ForceAnvilMod",
       "com.anjas.custominventory.CustomHotbarInventory"
+    ],
+    "client": [
+      "com.anjas.custominventory.client.CustomHotbarInventoryClient"
     ]
   },
   "mixins": ["fuelrecipe.mixins.json", "forceanvil.mixins.json"],
