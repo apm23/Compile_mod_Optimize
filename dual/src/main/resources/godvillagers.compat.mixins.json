@@ -7,8 +7,7 @@
     "TaczMagnetDeathMixin",
     "StormcallAnvilMixin",
     "GodHorseDamageMixin",
-    "GodHorseLeashMixin",
-    "GodHorseOptimizedMixin"
+    "GodHorseLeashMixin"
   ],
   "injectors": {
     "defaultRequire": 1
