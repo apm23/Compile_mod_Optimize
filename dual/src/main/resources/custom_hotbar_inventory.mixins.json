@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "package": "com.anjas.custominventory.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "ServerPlaceRecipeMixin",
+    "MerchantMenuMixin",
+    "TaczGunSmithTableMenuMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
