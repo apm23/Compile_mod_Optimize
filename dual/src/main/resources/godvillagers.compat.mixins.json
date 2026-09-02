@@ -4,7 +4,8 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [
     "TaczBulletDamageMixin",
-    "TaczMagnetDeathMixin"
+    "TaczMagnetDeathMixin",
+    "StormcallAnvilMixin"
   ],
   "injectors": {
     "defaultRequire": 1
