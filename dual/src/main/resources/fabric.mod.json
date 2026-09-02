@@ -12,7 +12,8 @@
       "com.anjas.fuelrecipe.FuelRecipeMod",
       "com.anjas.forceanvil.ForceAnvilMod",
       "com.anjas.custominventory.CustomHotbarInventory",
-      "apm23.compilemod.dual.functional.godvillager.GodVillagerRegistry"
+      "apm23.compilemod.dual.functional.godvillager.GodVillagerRegistry",
+      "com.anjas.godvillagers.TaczBridgeBootstrap"
     ],
     "client": [
       "com.anjas.custominventory.client.CustomHotbarInventoryClient"
