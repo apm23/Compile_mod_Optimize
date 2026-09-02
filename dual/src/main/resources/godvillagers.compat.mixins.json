@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "com.anjas.godvillagers.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "TaczBulletDamageMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
