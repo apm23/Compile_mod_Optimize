@@ -3,7 +3,8 @@
   "package": "com.anjas.godvillagers.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
-    "TaczBulletDamageMixin"
+    "TaczBulletDamageMixin",
+    "TaczMagnetDeathMixin"
   ],
   "injectors": {
     "defaultRequire": 1
