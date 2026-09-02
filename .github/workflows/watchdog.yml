@@ -1,0 +1,89 @@
+name: Consolidation Watchdog
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: compile-mod-optimize-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  watchdog:
+    name: Build / Regression Watchdog
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect project state
+        id: state
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f gradlew ]]; then
+            echo "gradle=true" >> "$GITHUB_OUTPUT"
+            echo "Gradle project detected."
+          else
+            echo "gradle=false" >> "$GITHUB_OUTPUT"
+            echo "Repository bootstrap state: gradlew is not present yet."
+          fi
+
+      - name: Set up Java 21
+        if: steps.state.outputs.gradle == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        if: steps.state.outputs.gradle == 'true'
+        run: chmod +x ./gradlew
+
+      - name: Validate Gradle wrapper
+        if: steps.state.outputs.gradle == 'true'
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Build
+        if: steps.state.outputs.gradle == 'true'
+        run: ./gradlew build --stacktrace --warning-mode all
+
+      - name: Run verification tasks when available
+        if: steps.state.outputs.gradle == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tasks="$(./gradlew tasks --all --console=plain)"
+
+          run_if_present() {
+            local task="$1"
+            if grep -Eq "^[[:space:]]*${task}([[:space:]-]|$)" <<< "$tasks"; then
+              echo "Running optional verification task: ${task}"
+              ./gradlew "$task" --stacktrace
+            else
+              echo "Optional task not present yet: ${task}"
+            fi
+          }
+
+          run_if_present check
+          run_if_present smokeTest
+          run_if_present serverSmokeTest
+          run_if_present clientSmokeTest
+          run_if_present regressionTest
+
+      - name: Bootstrap status
+        if: steps.state.outputs.gradle != 'true'
+        run: |
+          echo "Watchdog is installed and healthy."
+          echo "No build was attempted because the consolidation project has not been bootstrapped yet."
+          echo "Once gradlew is committed, this workflow automatically becomes a real build/regression gate."
