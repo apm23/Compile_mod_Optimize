@@ -47,10 +47,10 @@ public final class ChannelStorageData extends SavedData {
         ChannelStorageData data = new ChannelStorageData();
         for (ChannelRecord record : records) {
             NonNullList<ItemStack> list = NonNullList.withSize(SIZE, ItemStack.EMPTY);
-            for (int i = 0; i < Math.min(SIZE, record.items().size()); i++) {
-                list.set(i, record.items().get(i));
-            }
-            data.channels.put(normalize(record.name()), list);
+            for (int i = 0; i < Math.min(SIZE, record.items().size()); i++) list.set(i, record.items().get(i));
+            // Keep the key exactly as saved. Old worlds contain lower-case keys; inventory()
+            // migrates those lazily when an exact-name shulker first claims them.
+            data.channels.put(displayName(record.name()), list);
         }
         return data;
     }
@@ -63,18 +63,38 @@ public final class ChannelStorageData extends SavedData {
         return out;
     }
 
-    public NonNullList<ItemStack> inventory(String channel) {
-        return channels.computeIfAbsent(normalize(channel), ignored -> NonNullList.withSize(SIZE, ItemStack.EMPTY));
+    public NonNullList<ItemStack> inventory(String rawChannel) {
+        String exact = displayName(rawChannel);
+        NonNullList<ItemStack> existing = channels.get(exact);
+        if (existing != null) return existing;
+
+        // Backward compatibility for worlds saved by the old case-insensitive system.
+        // The first exact spelling to access an old lower-case key takes ownership of its
+        // storage. Any differently-capitalized name created later receives a new channel.
+        String legacy = exact.toLowerCase(Locale.ROOT);
+        if (!legacy.equals(exact)) {
+            NonNullList<ItemStack> old = channels.remove(legacy);
+            if (old != null) {
+                channels.put(exact, old);
+                setDirty();
+                return old;
+            }
+        }
+
+        NonNullList<ItemStack> created = NonNullList.withSize(SIZE, ItemStack.EMPTY);
+        channels.put(exact, created);
+        setDirty();
+        return created;
     }
 
     public static String displayName(String raw) {
-        if (raw == null) return "default";
-        String s = raw.strip().replaceAll("\\s+", " ");
-        return s.isBlank() ? "default" : s;
+        if (raw == null || raw.isBlank()) return "default";
+        return raw;
     }
 
+    /** Exact channel key; retained method name so old call sites do not need a behavior rewrite. */
     public static String normalize(String raw) {
-        return displayName(raw).toLowerCase(Locale.ROOT);
+        return displayName(raw);
     }
 
     public static ChannelStorageData get(MinecraftServer server) {
