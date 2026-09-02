@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "#minecraft:enchantable/weapon",
+    {
+      "id": "tacz:modern_kinetic_gun",
+      "required": false
+    }
+  ]
+}
