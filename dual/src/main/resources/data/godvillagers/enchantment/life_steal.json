@@ -1,0 +1,20 @@
+{
+  "description": {
+    "text": "Life Steal"
+  },
+  "supported_items": "#godvillagers:tacz_enchantable",
+  "weight": 2,
+  "max_level": 3,
+  "min_cost": {
+    "base": 20,
+    "per_level_above_first": 8
+  },
+  "max_cost": {
+    "base": 50,
+    "per_level_above_first": 8
+  },
+  "anvil_cost": 8,
+  "slots": [
+    "mainhand"
+  ]
+}
