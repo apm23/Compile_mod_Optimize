@@ -1,6 +1,8 @@
 package apm23.compilemod.dual.functional.godvillager;
 
+import com.anjas.godvillagers.GodHorseRuntime;
 import com.anjas.godvillagers.SpecialistSpawnEggItem;
+import com.anjas.godvillagers.StormcallRuntime;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.minecraft.core.Registry;
@@ -11,7 +13,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 
-/** Registers the proven-working God Villager specialist spawn eggs inside the consolidated dual jar. */
+/** Registers the proven-working God Villager specialist spawn eggs and runtimes inside the consolidated dual jar. */
 public final class GodVillagerRegistry implements ModInitializer {
     private static final String NAMESPACE = "godvillagers";
 
@@ -62,5 +64,8 @@ public final class GodVillagerRegistry implements ModInitializer {
             output.accept(GOD_LOOTING_EGG);
             output.accept(GOD_SKELETON_HORSE_EGG);
         });
+
+        GodHorseRuntime.register();
+        StormcallRuntime.register();
     }
 }
