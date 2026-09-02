@@ -1,0 +1,6 @@
+{
+  "required": true,
+  "package": "com.anjas.fuelrecipe.mixin",
+  "mixins": ["AbstractFurnaceBlockEntityMixin"],
+  "injectors": {"defaultRequire": 1}
+}

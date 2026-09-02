@@ -45,8 +45,13 @@ jobs:
           if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then exit "$code"; fi
           if grep -E -i 'mixin apply failed|mixin.*error|invalid injection|injection error|exception.*compile_mod_server|failed to load.*compile_mod_server' /tmp/compile-mod-server.log; then exit 1; fi
           grep -q 'Done (' /tmp/compile-mod-server.log || { echo 'Server never reached ready state.'; exit 1; }
-      - name: Upload build artifacts
+      - name: Upload server artifact
         uses: actions/upload-artifact@v4
         with:
           name: compile-mod-server-baseline
           path: build/libs/*.jar
+      - name: Upload dual artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: compile-mod-dual-baseline
+          path: dual/build/libs/*.jar

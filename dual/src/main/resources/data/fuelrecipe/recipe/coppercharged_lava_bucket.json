@@ -1,0 +1,6 @@
+{
+  "type":"minecraft:crafting_shapeless",
+  "category":"misc",
+  "ingredients":["minecraft:lava_bucket","minecraft:copper_ingot","#fuelrecipe:coal_or_charcoal"],
+  "result":{"id":"fuelrecipe:coppercharged_lava_bucket","count":1}
+}
