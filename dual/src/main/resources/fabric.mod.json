@@ -22,6 +22,7 @@
   "mixins": [
     "fuelrecipe.mixins.json",
     "forceanvil.mixins.json",
+    "custom_hotbar_inventory.mixins.json",
     "custom_hotbar_inventory.client.mixins.json",
     "godvillagers.compat.mixins.json"
   ],
