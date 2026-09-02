@@ -17,9 +17,9 @@ Custom Pickaxe recipe JSONs are preserved byte-for-byte under their original dat
 
 | Module | Golden reference | Source reference | Final location | Status |
 |---|---|---|---|---|
-| Linked Shulker | `linked-shulker-0.1.3-animated+mc26.2(1).jar` | `apm23/linked-shulker` | `dual/src/main/java/apm23/compilemod/dual/storage/linkedshulker` + `assets/data linkedshulker` | Golden core + animated models + textures + recipe/loot migrated; verification pending on next dual build |
+| Linked Shulker | `linked-shulker-0.1.3-animated+mc26.2(1).jar` | `apm23/linked-shulker` | `dual/src/main/java/apm23/compilemod/dual/storage/linkedshulker` | Golden core + assets/models migrated; build + dual artifact green on run #10 |
 | Fuel / Recipe | `fuel-recipe-0.1.0+mc26.2(1).jar` | `apm23/fuel-recipe` | `dual/src/main/java/apm23/compilemod/dual/recipe/fuel` + `data/fuelrecipe/recipe` | Golden JAR baseline migrated; build + dual artifact green on run #8. Lighting subsystem from newer source HEAD intentionally excluded because it is absent from golden JAR. |
-| Force Anvil | `force-anvil-0.1.0-alpha.9+mc26.2(1).jar` | `apm23/force-anvil` | `dual/src/main/java/apm23/compilemod/dual/functional/forceanvil` + `data/forceanvil/recipe` | Golden core/mixins/recipes migrated; build + regression + server smoke + dual artifact green on run #9; visual model/assets still pending |
+| Force Anvil | `force-anvil-0.1.0-alpha.9+mc26.2(1).jar` | `apm23/force-anvil` | `dual/src/main/java/apm23/compilemod/dual/functional/forceanvil` + `data/forceanvil/recipe` | Golden core/mixins/recipes green on run #9; golden visual/loot assets now migrated, verification pending |
 | Custom Hotbar Inventory | `custom-hotbar-inventory-1.0.0-tacz-workbench-multipage-fix-mc26.2(1).jar` | `apm23/custom-hotbar-inventory` | TBD by responsibility | Pending |
 | God Villager | `god-villagers-0.1.0-alpha.85+mc26.2 (4).jar` | `apm23/god-villager` | TBD by responsibility | Pending; golden JAR contains optional TACZ bridge/mixin, so migration must preserve compatibility without bundling TACZ |
 
