@@ -9,10 +9,11 @@
   "entrypoints": {
     "main": [
       "com.anjas.linkedshulker.LinkedShulkerMod",
-      "com.anjas.fuelrecipe.FuelRecipeMod"
+      "com.anjas.fuelrecipe.FuelRecipeMod",
+      "com.anjas.forceanvil.ForceAnvilMod"
     ]
   },
-  "mixins": ["fuelrecipe.mixins.json"],
+  "mixins": ["fuelrecipe.mixins.json", "forceanvil.mixins.json"],
   "depends": {
     "fabricloader": ">=0.19.3",
     "minecraft": "26.2",
