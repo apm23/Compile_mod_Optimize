@@ -29,7 +29,8 @@ public final class CustomHotbarInventory implements ModInitializer {
         registerPayloads();
         registerReceivers();
         registerLifecycle();
-        LOGGER.info("Custom Hotbar Inventory initialized (TACZ compatibility isolated from core bundle)");
+        TaczAmmoCompat.init();
+        LOGGER.info("Custom Hotbar Inventory initialized");
     }
 
     private static void registerPayloads(){
