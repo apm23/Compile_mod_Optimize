@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "apm23.compilemod.server.xp.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "ExperienceOrbMixin",
+    "LivingEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,45 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+version = project.mod_version
+group = project.maven_group
+base { archivesName = project.archives_base_name }
+
+repositories {
+    maven {
+        name = 'Fuzs Mod Resources'
+        url = 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/'
+        content { includeGroup 'fuzs.forgeconfigapiport' }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    runtimeOnly "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:26.2.1"
+}
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "compile-mod-server-gametest"
+        enableGameTests = true
+        enableClientGameTests = false
+        eula = true
+    }
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand 'version': project.version }
+}
+
+tasks.withType(JavaCompile).configureEach { it.options.release = 25 }
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
