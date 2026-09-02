@@ -1,0 +1,34 @@
+# Consolidation migration status
+
+This ledger prevents accidental behavior drift while the proven-working mods are consolidated by responsibility.
+
+## Server-only bundle
+
+| Module | Golden reference | Source reference | Final location | Status |
+|---|---|---|---|---|
+| XP / Global Mending + optional TACZ kill XP multiplier | `exp-system-0.1.0 (2).jar` supplied by user | `apm23/Exp_System` | `apm23.compilemod.server.xp` | Migrated baseline; CI verification pending |
+| Custom Pickaxe | `custom-pickaxe-0.1.0 (7).jar` supplied by user | `apm23/Custom_Pickaxe` | TBD by responsibility | Pending |
+
+`create-lava-source` is **not** included in the consolidated server-only bundle at this stage because its current source directly targets Create classes and contains client-side Create mixins. Create itself is explicitly excluded from the consolidation target. It remains external unless a later evidence-backed requirement safely separates a truly server-only, non-bundled compatibility layer.
+
+## Dual bundle
+
+| Module | Golden reference | Source reference | Status |
+|---|---|---|---|
+| Linked Shulker | `linked-shulker-0.1.3-animated+mc26.2(1).jar` | `apm23/linked-shulker` | Pending |
+| Fuel / Recipe | `fuel-recipe-0.1.0+mc26.2(1).jar` | `apm23/fuel-recipe` | Pending; source HEAD must not override golden behavior blindly |
+| Force Anvil | `force-anvil-0.1.0-alpha.9+mc26.2(1).jar` | `apm23/force-anvil` | Pending |
+| Custom Hotbar Inventory | `custom-hotbar-inventory-1.0.0-tacz-workbench-multipage-fix-mc26.2(1).jar` | `apm23/custom-hotbar-inventory` | Pending |
+| God Villager | `god-villagers-0.1.0-alpha.85+mc26.2 (4).jar` | `apm23/god-villager` | Pending |
+
+## Explicitly excluded from consolidation
+
+- TACZ itself and TACZ AmmoBox Tweak
+- Create
+- Create–VS2 compatibility system
+
+Optional compatibility logic may exist only when it does not bundle the excluded mod and is required to preserve proven behavior.
+
+## Migration rule
+
+Golden JAR behavior wins over a newer source HEAD when they disagree. Source repositories are implementation references. Every migration must pass compile/regression/smoke evidence before its status can become verified.
