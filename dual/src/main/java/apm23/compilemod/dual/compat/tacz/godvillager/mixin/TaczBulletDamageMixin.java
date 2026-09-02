@@ -1,6 +1,7 @@
 package com.anjas.godvillagers.mixin;
 
 import com.anjas.godvillagers.TaczEnchantRuntime;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -20,12 +21,12 @@ public abstract class TaczBulletDamageMixin {
     private float godvillagers$healthBeforeDamage;
 
     @Inject(method = "hurtServer", at = @At("HEAD"), require = 0)
-    private void godvillagers$captureHealthBeforeDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+    private void godvillagers$captureHealthBeforeDamage(ServerLevel level, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         godvillagers$healthBeforeDamage = ((LivingEntity)(Object)this).getHealth();
     }
 
     @Inject(method = "hurtServer", at = @At("RETURN"), require = 0)
-    private void godvillagers$afterServerDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+    private void godvillagers$afterServerDamage(ServerLevel level, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         if (!cir.getReturnValue()) return;
         LivingEntity victim = (LivingEntity)(Object)this;
         float dealt = TaczEnchantRuntime.actualDamage(godvillagers$healthBeforeDamage, victim.getHealth());
