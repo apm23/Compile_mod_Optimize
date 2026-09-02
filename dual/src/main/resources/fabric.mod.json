@@ -17,7 +17,11 @@
       "com.anjas.custominventory.client.CustomHotbarInventoryClient"
     ]
   },
-  "mixins": ["fuelrecipe.mixins.json", "forceanvil.mixins.json"],
+  "mixins": [
+    "fuelrecipe.mixins.json",
+    "forceanvil.mixins.json",
+    "custom_hotbar_inventory.client.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.19.3",
     "minecraft": "26.2",
