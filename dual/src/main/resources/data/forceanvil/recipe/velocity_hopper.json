@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [" C "," H "," C "],
+  "key": {
+    "C": "minecraft:copper_ingot",
+    "H": "minecraft:hopper"
+  },
+  "result": {"id": "forceanvil:velocity_hopper", "count": 1}
+}
