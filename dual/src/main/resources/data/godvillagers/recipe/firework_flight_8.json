@@ -1,0 +1,5 @@
+{
+  "type":"minecraft:crafting_shapeless","category":"misc","group":"godvillagers_firework_flight",
+  "ingredients":["minecraft:firework_rocket","minecraft:copper_ingot","minecraft:copper_ingot","minecraft:copper_ingot","minecraft:copper_ingot","minecraft:copper_ingot"],
+  "result":{"id":"minecraft:firework_rocket","count":1,"components":{"minecraft:fireworks":{"flight_duration":8,"explosions":[]}}}
+}
