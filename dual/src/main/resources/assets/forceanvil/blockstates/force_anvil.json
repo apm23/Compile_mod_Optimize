@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "forceanvil:block/force_anvil", "y": 0 },
+    "facing=east":  { "model": "forceanvil:block/force_anvil", "y": 90 },
+    "facing=south": { "model": "forceanvil:block/force_anvil", "y": 180 },
+    "facing=west":  { "model": "forceanvil:block/force_anvil", "y": 270 }
+  }
+}
