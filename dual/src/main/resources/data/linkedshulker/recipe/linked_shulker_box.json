@@ -1,0 +1,7 @@
+{
+  "type":"minecraft:crafting_shaped",
+  "category":"misc",
+  "pattern":["ECE"],
+  "key":{"E":"minecraft:ender_pearl","C":"minecraft:chest"},
+  "result":{"id":"linkedshulker:linked_shulker_box","count":1}
+}
