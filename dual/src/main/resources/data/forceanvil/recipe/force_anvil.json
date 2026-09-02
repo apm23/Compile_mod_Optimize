@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "BBB",
+    "CIC",
+    "III"
+  ],
+  "key": {
+    "B": "minecraft:iron_block",
+    "C": "minecraft:copper_ingot",
+    "I": "minecraft:iron_ingot"
+  },
+  "result": {
+    "id": "forceanvil:force_anvil",
+    "count": 1
+  }
+}
