@@ -6,10 +6,12 @@ This ledger prevents accidental behavior drift while the proven-working mods are
 
 | Module | Golden reference | Source reference | Final location | Status |
 |---|---|---|---|---|
-| XP / Global Mending + optional TACZ kill XP multiplier | `exp-system-0.1.0 (2).jar` supplied by user | `apm23/Exp_System` | `apm23.compilemod.server.xp` | Migrated baseline; CI verification pending |
-| Custom Pickaxe | `custom-pickaxe-0.1.0 (7).jar` supplied by user | `apm23/Custom_Pickaxe` | TBD by responsibility | Pending |
+| XP / Global Mending + optional TACZ kill XP multiplier | `exp-system-0.1.0 (2).jar` supplied by user | `apm23/Exp_System` | `apm23.compilemod.server.xp` | Verified baseline: build + GameTest + dedicated-server smoke green on run #5 |
+| Custom Pickaxe | `custom-pickaxe-0.1.0 (7).jar` supplied by user | `apm23/Custom_Pickaxe` | `src/main/java/apm23/compilemod/server/mining` (legacy Java package retained during golden migration) | Migrated baseline; verification pending |
 
-`create-lava-source` is **not** included in the consolidated server-only bundle at this stage because its current source directly targets Create classes and contains client-side Create mixins. Create itself is explicitly excluded from the consolidation target. It remains external unless a later evidence-backed requirement safely separates a truly server-only, non-bundled compatibility layer.
+Custom Pickaxe recipe JSONs are preserved byte-for-byte under their original data namespace so recipe IDs and hidden custom-data signatures do not drift during consolidation. Java source is physically grouped under the final `server/mining` responsibility directory while retaining the proven class package for the first regression gate.
+
+`create-lava-source` is **not** included in the consolidated server-only bundle because its current source directly targets Create classes and contains client-side Create mixins. Create itself is explicitly excluded from consolidation.
 
 ## Dual bundle
 

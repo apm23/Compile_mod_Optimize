@@ -7,6 +7,7 @@ group = project.maven_group
 base { archivesName = project.archives_base_name }
 
 repositories {
+    mavenCentral()
     maven {
         name = 'Fuzs Mod Resources'
         url = 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/'
@@ -19,6 +20,9 @@ dependencies {
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
     runtimeOnly "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:26.2.1"
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 fabricApi {
@@ -37,6 +41,7 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach { it.options.release = 25 }
+tasks.named('test') { useJUnitPlatform() }
 
 java {
     withSourcesJar()

@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    "minecraft:redstone",
+    "minecraft:redstone",
+    "minecraft:stick"
+  ],
+  "result": {
+    "id": "minecraft:iron_pickaxe",
+    "count": 1,
+    "components": {
+      "minecraft:custom_data": {
+        "custom_pickaxe": {
+          "type": "redstone",
+          "enabled": true,
+          "version": 1
+        }
+      }
+    }
+  },
+  "show_notification": false
+}

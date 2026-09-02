@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": ["minecraft:amethyst_cluster"],
+  "result": {"id": "minecraft:amethyst_shard", "count": 4},
+  "show_notification": false
+}

@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": ["minecraft:amethyst_shard", "minecraft:amethyst_shard", "minecraft:stick"],
+  "result": {"id": "minecraft:iron_pickaxe", "count": 1, "components": {"minecraft:custom_data": {"custom_pickaxe": {"type": "amethyst", "enabled": true, "version": 1}}}},
+  "show_notification": false
+}

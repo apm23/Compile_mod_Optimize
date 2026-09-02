@@ -6,6 +6,9 @@
   "description": "Consolidated server-only custom modules for Minecraft 26.2.",
   "authors": ["apm23"],
   "environment": "server",
+  "entrypoints": {
+    "main": ["com.apm23.custompickaxe.CustomPickaxeMod"]
+  },
   "mixins": ["compile_mod_server.mixins.json"],
   "depends": {
     "fabricloader": ">=0.19.3",

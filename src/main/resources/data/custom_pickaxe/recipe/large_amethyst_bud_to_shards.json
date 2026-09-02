@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": ["minecraft:large_amethyst_bud"],
+  "result": {"id": "minecraft:amethyst_shard", "count": 3},
+  "show_notification": false
+}
