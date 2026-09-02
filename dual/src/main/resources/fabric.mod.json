@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "compile_mod_dual",
+  "version": "${version}",
+  "name": "Compile Mod Dual",
+  "description": "Consolidated client+server custom modules for Minecraft 26.2.",
+  "authors": ["apm23"],
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.anjas.linkedshulker.LinkedShulkerMod"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

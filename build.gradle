@@ -42,6 +42,7 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach { it.options.release = 25 }
 tasks.named('test') { useJUnitPlatform() }
+tasks.named('build') { dependsOn(':dual:build') }
 
 java {
     withSourcesJar()
