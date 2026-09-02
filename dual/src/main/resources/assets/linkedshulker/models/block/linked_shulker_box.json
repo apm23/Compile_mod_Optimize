@@ -1,0 +1,12 @@
+{
+  "textures": {
+    "side": "linkedshulker:block/linked_shulker_side",
+    "top": "linkedshulker:block/linked_shulker_top",
+    "bottom": "linkedshulker:block/linked_shulker_bottom",
+    "particle": "linkedshulker:block/linked_shulker_side"
+  },
+  "elements": [
+    {"from":[0,0,0],"to":[16,7.5,16],"faces":{"down":{"texture":"#bottom"},"up":{"texture":"#side"},"north":{"texture":"#side"},"south":{"texture":"#side"},"west":{"texture":"#side"},"east":{"texture":"#side"}}},
+    {"from":[0,8.5,0],"to":[16,16,16],"faces":{"down":{"texture":"#side"},"up":{"texture":"#top"},"north":{"texture":"#side"},"south":{"texture":"#side"},"west":{"texture":"#side"},"east":{"texture":"#side"}}}
+  ]
+}
