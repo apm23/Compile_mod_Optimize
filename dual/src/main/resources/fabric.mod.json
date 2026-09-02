@@ -11,7 +11,8 @@
       "com.anjas.linkedshulker.LinkedShulkerMod",
       "com.anjas.fuelrecipe.FuelRecipeMod",
       "com.anjas.forceanvil.ForceAnvilMod",
-      "com.anjas.custominventory.CustomHotbarInventory"
+      "com.anjas.custominventory.CustomHotbarInventory",
+      "apm23.compilemod.dual.functional.godvillager.GodVillagerRegistry"
     ],
     "client": [
       "com.anjas.custominventory.client.CustomHotbarInventoryClient"
