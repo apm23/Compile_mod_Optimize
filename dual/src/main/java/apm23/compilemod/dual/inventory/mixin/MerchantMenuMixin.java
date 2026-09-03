@@ -3,7 +3,7 @@ package com.anjas.custominventory.mixin;
 import com.anjas.custominventory.CustomHotbarInventory;
 import com.anjas.custominventory.InventoryStorage;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.MerchantContainer;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.item.ItemStack;
@@ -16,6 +16,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.ArrayList;
@@ -74,31 +75,36 @@ public abstract class MerchantMenuMixin {
     }
 
     /**
-     * Vanilla MerchantMenu only returns remaining payment-slot items to the materialized inventory
-     * when the menu closes. If that page is full it drops the change, even when another virtual
-     * page still has room. Pre-empt that close path with the same merge-first virtual insertion
-     * used by paged trading, then clear the payment slots so vanilla has nothing left to drop.
+     * Vanilla 26.2 returns both merchant payment slots on close through
+     * Inventory.placeItemBackInInventory(), which only sees the currently materialized 36 slots.
+     * Redirect that exact call so hidden pages participate before vanilla is allowed to drop.
      */
-    @Inject(method = "removed", at = @At("HEAD"))
-    private void custominventory$returnChangeAcrossPages(Player closingPlayer, CallbackInfo ci) {
-        if (!(closingPlayer instanceof ServerPlayer player)) return;
-
-        ItemStack first = this.tradeContainer.getItem(0).copy();
-        ItemStack second = this.tradeContainer.getItem(1).copy();
-        if (first.isEmpty() && second.isEmpty()) return;
+    @Redirect(
+            method = "removed",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/player/Inventory;placeItemBackInInventory(Lnet/minecraft/world/item/ItemStack;)V"
+            )
+    )
+    private void custominventory$returnMerchantStackAcrossPages(Inventory inventory, ItemStack returned) {
+        if (returned.isEmpty() || !(inventory.player instanceof ServerPlayer player)) {
+            inventory.placeItemBackInInventory(returned);
+            return;
+        }
 
         InventoryStorage.snapshotLive(player);
         int activePage = InventoryStorage.active(player);
         List<ItemStack> working = custominventory$snapshotVirtualInventory(player);
+        ItemStack candidate = returned.copy();
 
-        // Atomic close: either both payment/change stacks fit somewhere in the virtual inventory,
-        // or leave the menu untouched and let vanilla use its normal fallback behavior.
-        if (!custominventory$insertFully(working, first.copy())) return;
-        if (!custominventory$insertFully(working, second.copy())) return;
+        if (!custominventory$insertFully(working, candidate)) {
+            // Preserve vanilla's drop behavior only when hotbar + every virtual page are genuinely full.
+            inventory.placeItemBackInInventory(returned);
+            return;
+        }
 
         custominventory$commitVirtualInventory(player, activePage, working);
-        this.tradeContainer.setItem(0, ItemStack.EMPTY);
-        this.tradeContainer.setItem(1, ItemStack.EMPTY);
+        returned.setCount(0);
         InventoryStorage.sync(player);
         CustomHotbarInventory.sendHiddenRecipeState(player);
     }
