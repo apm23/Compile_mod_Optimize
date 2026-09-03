@@ -32,6 +32,44 @@ jobs:
         run: gradle clean build --stacktrace --warning-mode all
       - name: Global Mending regression GameTest
         run: gradle runGametest --stacktrace
+      - name: Final JAR integrity audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          server_jar=$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | head -n1)
+          dual_jar=$(find dual/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | head -n1)
+          test -n "$server_jar" && test -f "$server_jar"
+          test -n "$dual_jar" && test -f "$dual_jar"
+          jar tf "$server_jar" > /tmp/server-jar.txt
+          jar tf "$dual_jar" > /tmp/dual-jar.txt
+
+          require_entry() {
+            local list="$1" entry="$2"
+            grep -Fxq "$entry" "$list" || { echo "Missing packaged entry: $entry"; exit 1; }
+          }
+
+          require_entry /tmp/server-jar.txt 'apm23/compilemod/server/mining/CustomPickaxeMod.class'
+          require_entry /tmp/server-jar.txt 'apm23/compilemod/server/xp/mixin/ExperienceOrbMixin.class'
+          require_entry /tmp/server-jar.txt 'compile_mod_server.mixins.json'
+
+          require_entry /tmp/dual-jar.txt 'com/anjas/custominventory/CustomHotbarInventory.class'
+          require_entry /tmp/dual-jar.txt 'com/anjas/custominventory/MerchantMenuMixin.class'
+          require_entry /tmp/dual-jar.txt 'com/anjas/custominventory/ServerPlaceRecipeMixin.class'
+          require_entry /tmp/dual-jar.txt 'com/anjas/custominventory/TaczGunSmithTableMenuMixin.class'
+          require_entry /tmp/dual-jar.txt 'com/anjas/godvillagers/GodHorseRuntime.class'
+          require_entry /tmp/dual-jar.txt 'com/anjas/godvillagers/StormcallRuntime.class'
+          require_entry /tmp/dual-jar.txt 'com/anjas/forceanvil/ForceAnvilMenuMixin.class'
+          require_entry /tmp/dual-jar.txt 'data/minecraft/tags/block/anvil.json'
+          require_entry /tmp/dual-jar.txt 'custom_hotbar_inventory.mixins.json'
+          require_entry /tmp/dual-jar.txt 'assets/linkedshulker/blockstates/linked_shulker_box.json'
+          require_entry /tmp/dual-jar.txt 'assets/linkedshulker/models/block/linked_shulker_box_open_7.json'
+          require_entry /tmp/dual-jar.txt 'assets/linkedshulker/models/item/linked_shulker_box.json'
+
+          if grep -Eq '^(com/tacz/|com/simibubi/create/)' /tmp/dual-jar.txt /tmp/server-jar.txt; then
+            echo 'Forbidden TACZ/Create implementation classes were bundled.'
+            exit 1
+          fi
+          echo "Artifact integrity passed: $server_jar + $dual_jar"
       - name: Dedicated server startup smoke
         shell: bash
         run: |
@@ -49,13 +87,20 @@ jobs:
           if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then exit "$code"; fi
           if grep -E -i 'mixin apply failed|invalid injection|injection error|exception.*compile_mod_(server|dual)|failed to load.*compile_mod_(server|dual)' /tmp/compile-mod-server.log; then exit 1; fi
           grep -q 'Done (' /tmp/compile-mod-server.log || { echo 'Server never reached ready state.'; exit 1; }
+          grep -q 'Inventory sort/merge startup self-tests passed' /tmp/compile-mod-server.log || { echo 'Inventory runtime self-tests did not execute.'; exit 1; }
       - name: Upload server artifact
         uses: actions/upload-artifact@v4
         with:
           name: compile-mod-server-baseline
-          path: build/libs/*.jar
+          path: |
+            build/libs/*.jar
+            !build/libs/*-sources.jar
+            !build/libs/*-dev.jar
       - name: Upload dual artifact
         uses: actions/upload-artifact@v4
         with:
           name: compile-mod-dual-baseline
-          path: dual/build/libs/*.jar
+          path: |
+            dual/build/libs/*.jar
+            !dual/build/libs/*-sources.jar
+            !dual/build/libs/*-dev.jar
