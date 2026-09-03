@@ -73,6 +73,17 @@ jobs:
           require_entry /tmp/dual-jar.txt 'assets/linkedshulker/models/block/linked_shulker_box_open_7.json'
           require_entry /tmp/dual-jar.txt 'assets/linkedshulker/models/item/linked_shulker_box.json'
 
+          # The inventory orchestrator is deliberately locked to the proven standalone
+          # implementation. This catches lifecycle/page-sync regressions even when the
+          # consolidated source still compiles and server smoke reaches ready state.
+          rm -rf /tmp/inventory-orchestrator-audit
+          mkdir -p /tmp/inventory-orchestrator-audit
+          (
+            cd /tmp/inventory-orchestrator-audit
+            jar xf "$GITHUB_WORKSPACE/$dual_jar" com/anjas/custominventory/CustomHotbarInventory.class
+          )
+          echo '16aadc7c6f72b3e433e45f2715afb2adee157eb0eab1d937baf1fd2da63c22ce  /tmp/inventory-orchestrator-audit/com/anjas/custominventory/CustomHotbarInventory.class' | sha256sum --check --strict
+
           if grep -Eq '^(com/tacz/|com/simibubi/create/)' /tmp/dual-jar.txt /tmp/server-jar.txt; then
             echo 'Forbidden TACZ/Create implementation classes were bundled.'
             exit 1
