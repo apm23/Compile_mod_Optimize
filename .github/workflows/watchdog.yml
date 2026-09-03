@@ -97,11 +97,13 @@ jobs:
 
           # Survival-fix invariants: server preserves carried items through page sync, client keeps
           # the carried item across the PageState acknowledgement, sort/merge is gated by the
-          # actual inventory menu, and merchant close has a paged change-return path.
+          # actual inventory menu but intentionally does not require an empty carried item, and
+          # merchant close has a paged change-return path.
           grep -Fq 'player.containerMenu.setCarried(carried.copy())' dual/src/main/java/apm23/compilemod/dual/inventory/api/InventoryStorage.java
           grep -Fq 'pendingPageCarried=client.player==null?ItemStack.EMPTY:client.player.containerMenu.getCarried().copy()' dual/src/main/java/apm23/compilemod/dual/inventory/client/CustomHotbarInventoryClient.java
           grep -Fq 'client.player.containerMenu.setCarried(pendingPageCarried.copy())' dual/src/main/java/apm23/compilemod/dual/inventory/client/CustomHotbarInventoryClient.java
-          grep -Fq 'p.containerMenu==p.inventoryMenu&&p.containerMenu.getCarried().isEmpty()' dual/src/main/java/apm23/compilemod/dual/inventory/core/CustomHotbarInventory.java
+          grep -Fq 'private static boolean canReorganizePages(ServerPlayer p){return p.containerMenu==p.inventoryMenu;}' dual/src/main/java/apm23/compilemod/dual/inventory/core/CustomHotbarInventory.java
+          ! grep -Fq 'canReorganizePages(ServerPlayer p){return p.containerMenu==p.inventoryMenu&&p.containerMenu.getCarried().isEmpty();}' dual/src/main/java/apm23/compilemod/dual/inventory/core/CustomHotbarInventory.java
           grep -Fq 'custominventory$returnChangeAcrossPages' dual/src/main/java/apm23/compilemod/dual/inventory/mixin/MerchantMenuMixin.java
 
           if grep -Eq '^(com/tacz/|com/simibubi/create/)' /tmp/dual-jar.txt /tmp/server-jar.txt; then
