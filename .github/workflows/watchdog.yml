@@ -32,6 +32,8 @@ jobs:
         run: gradle clean build --stacktrace --warning-mode all
       - name: Global Mending regression GameTest
         run: gradle runGametest --stacktrace
+      - name: Inventory carried-item client functional smoke
+        run: xvfb-run -a gradle :dual:runClientGameTest --stacktrace
       - name: Final JAR integrity audit
         shell: bash
         run: |
