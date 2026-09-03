@@ -23,22 +23,22 @@ public final class CustomHotbarInventory implements ModInitializer {
 
     @Override public void onInitialize(){
         InventoryStorage.register();
-        PayloadTypeRegistry.playC2S().register(ModPayloads.CyclePage.TYPE,ModPayloads.CyclePage.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.SwapHotbar.TYPE,ModPayloads.SwapHotbar.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.SortAll.TYPE,ModPayloads.SortAll.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.MergeAll.TYPE,ModPayloads.MergeAll.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.BrowseOpen.TYPE,ModPayloads.BrowseOpen.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.BrowseClose.TYPE,ModPayloads.BrowseClose.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.DirectPage.P1.TYPE,ModPayloads.DirectPage.P1.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.DirectPage.P2.TYPE,ModPayloads.DirectPage.P2.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.DirectPage.P3.TYPE,ModPayloads.DirectPage.P3.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.DirectPage.P4.TYPE,ModPayloads.DirectPage.P4.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.DirectPage.P5.TYPE,ModPayloads.DirectPage.P5.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.DirectPage.P6.TYPE,ModPayloads.DirectPage.P6.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.DirectPage.P7.TYPE,ModPayloads.DirectPage.P7.CODEC);
-        PayloadTypeRegistry.playC2S().register(ModPayloads.DirectPage.P8.TYPE,ModPayloads.DirectPage.P8.CODEC);
-        PayloadTypeRegistry.playS2C().register(ModPayloads.PageState.TYPE,ModPayloads.PageState.CODEC);
-        PayloadTypeRegistry.playS2C().register(ModPayloads.HiddenRecipeContents.TYPE,ModPayloads.HiddenRecipeContents.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.CyclePage.TYPE,ModPayloads.CyclePage.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.SwapHotbar.TYPE,ModPayloads.SwapHotbar.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.SortAll.TYPE,ModPayloads.SortAll.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.MergeAll.TYPE,ModPayloads.MergeAll.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.BrowseOpen.TYPE,ModPayloads.BrowseOpen.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.BrowseClose.TYPE,ModPayloads.BrowseClose.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.DirectPage.P1.TYPE,ModPayloads.DirectPage.P1.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.DirectPage.P2.TYPE,ModPayloads.DirectPage.P2.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.DirectPage.P3.TYPE,ModPayloads.DirectPage.P3.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.DirectPage.P4.TYPE,ModPayloads.DirectPage.P4.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.DirectPage.P5.TYPE,ModPayloads.DirectPage.P5.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.DirectPage.P6.TYPE,ModPayloads.DirectPage.P6.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.DirectPage.P7.TYPE,ModPayloads.DirectPage.P7.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ModPayloads.DirectPage.P8.TYPE,ModPayloads.DirectPage.P8.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(ModPayloads.PageState.TYPE,ModPayloads.PageState.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(ModPayloads.HiddenRecipeContents.TYPE,ModPayloads.HiddenRecipeContents.CODEC);
 
         ServerPlayNetworking.registerGlobalReceiver(ModPayloads.CyclePage.TYPE,(p,c)->c.server().execute(()->{if(canSwitchPages(c.player())){InventoryStorage.cycle(c.player());sendState(c.player());}}));
         ServerPlayNetworking.registerGlobalReceiver(ModPayloads.BrowseOpen.TYPE,(p,c)->c.server().execute(()->{InventoryStorage.setBrowsing(c.player(),true);InventoryStorage.switchPage(c.player(),0);sendState(c.player());}));
