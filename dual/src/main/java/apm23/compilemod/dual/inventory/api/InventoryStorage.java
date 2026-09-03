@@ -116,13 +116,27 @@ public final class InventoryStorage {
 
     public static void switchPage(ServerPlayer player, int targetPage) {
         validatePage(targetPage);
+
+        // Treat a page transition as one server-authoritative transaction. The item currently
+        // carried by the menu is not part of any inventory page; it must survive while the 27
+        // materialized page slots are replaced underneath the open screen.
+        ItemStack carried = player.containerMenu.getCarried().copy();
         int current = active(player);
         List<ItemStack> currentLive = liveCopy(player);
         List<ItemStack> next = current == targetPage ? currentLive : read(player, targetPage);
+
+        // Snapshot the source page after the preceding slot-click has removed the carried item,
+        // then materialize the destination page. This prevents the source slot from being restored
+        // during the same transition.
         write(player, current, currentLive);
         loadLive(player, next);
         target(player).setAttached(ACTIVE_PAGE, targetPage);
+
+        // Reassert the carried item before AND after the menu resync. This explicitly guarantees:
+        // pick item -> switch page -> same item remains on cursor -> place it on destination page.
+        player.containerMenu.setCarried(carried.copy());
         sync(player);
+        player.containerMenu.setCarried(carried);
     }
 
     public static void cycle(ServerPlayer player) { switchPage(player, (active(player) + 1) % PAGE_COUNT); }
@@ -186,10 +200,6 @@ public final class InventoryStorage {
     }
 
     public static void sync(ServerPlayer player) {
-        // Page swaps rewrite the 27 materialized inventory slots, but the cursor/carried stack
-        // belongs to the open menu rather than to those slots. Preserve it explicitly across the
-        // full-state broadcast so a page change can never make a carried item disappear or snap
-        // back to its source slot because of menu resynchronization.
         ItemStack carried = player.containerMenu.getCarried().copy();
         player.getInventory().setChanged();
         player.containerMenu.setCarried(carried.copy());
