@@ -13,6 +13,9 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @SuppressWarnings("UnstableApiUsage")
 public final class InventoryPageClientGameTest implements FabricClientGameTest {
     private static final int INVENTORY_IMAGE_WIDTH = 176;
@@ -59,7 +62,104 @@ public final class InventoryPageClientGameTest implements FabricClientGameTest {
             ItemStack sourcePageSlot = singleplayer.getServer().computeOnServer(server ->
                     InventoryStorage.read(server.getPlayerList().getPlayers().getFirst(), 0).get(0));
             assertTrue(sourcePageSlot.isEmpty(), "source page still contains the moved item: " + sourcePageSlot);
+
+            runRepeatedSortMerge(context, singleplayer);
         }
+    }
+
+    private static void runRepeatedSortMerge(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+        singleplayer.getServer().runOnServer(server -> {
+            var player = server.getPlayerList().getPlayers().getFirst();
+            InventoryStorage.switchPage(player, 0);
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) InventoryStorage.write(player, page, emptyPage());
+            player.getInventory().setItem(9, new ItemStack(Items.STONE, 30));
+            player.getInventory().setItem(10, new ItemStack(Items.DIRT, 5));
+            player.getInventory().setItem(11, new ItemStack(Items.BREAD, 2));
+            InventoryStorage.snapshotLive(player);
+            List<ItemStack> page2 = emptyPage();
+            page2.set(0, new ItemStack(Items.STONE, 40));
+            page2.set(1, new ItemStack(Items.DIAMOND, 3));
+            InventoryStorage.write(player, 1, page2);
+            InventoryStorage.sync(player);
+        });
+        context.waitTicks(4);
+
+        sendAndWait(context, new ModPayloads.MergeAll());
+        assertItemTotal(singleplayer, Items.STONE, 70, "first merge");
+        assertStackCount(singleplayer, Items.STONE, 2, "first merge");
+
+        singleplayer.getServer().runOnServer(server -> {
+            var player = server.getPlayerList().getPlayers().getFirst();
+            player.getInventory().setItem(35, new ItemStack(Items.STONE, 10));
+            InventoryStorage.snapshotLive(player);
+            InventoryStorage.sync(player);
+        });
+        context.waitTicks(3);
+
+        sendAndWait(context, new ModPayloads.MergeAll());
+        assertItemTotal(singleplayer, Items.STONE, 80, "second consecutive merge");
+        assertStackCount(singleplayer, Items.STONE, 2, "second consecutive merge");
+
+        sendAndWait(context, new ModPayloads.SortAll());
+        ItemStack firstAfterSort = storedSlot(singleplayer, 0, 0);
+        assertTrue(firstAfterSort.is(Items.BREAD), "first sort did not put food first; found " + firstAfterSort);
+
+        singleplayer.getServer().runOnServer(server -> {
+            var player = server.getPlayerList().getPlayers().getFirst();
+            List<ItemStack> page3 = InventoryStorage.read(player, 2);
+            page3.set(26, new ItemStack(Items.APPLE, 1));
+            InventoryStorage.write(player, 2, page3);
+            InventoryStorage.loadLive(player, InventoryStorage.read(player, InventoryStorage.active(player)));
+            InventoryStorage.sync(player);
+        });
+        context.waitTicks(3);
+
+        sendAndWait(context, new ModPayloads.SortAll());
+        ItemStack firstAfterSecondSort = storedSlot(singleplayer, 0, 0);
+        assertTrue(firstAfterSecondSort.is(Items.APPLE),
+                "second consecutive sort was ignored; expected apple first, found " + firstAfterSecondSort);
+        assertItemTotal(singleplayer, Items.STONE, 80, "second consecutive sort conservation");
+        assertItemTotal(singleplayer, Items.APPLE, 1, "second consecutive sort apple conservation");
+    }
+
+    private static void sendAndWait(ClientGameTestContext context, net.minecraft.network.protocol.common.custom.CustomPacketPayload payload) {
+        context.runOnClient(client -> ClientPlayNetworking.send(payload));
+        context.waitTicks(6);
+    }
+
+    private static List<ItemStack> emptyPage() {
+        ArrayList<ItemStack> page = new ArrayList<>(InventoryStorage.PAGE_SIZE);
+        for (int i = 0; i < InventoryStorage.PAGE_SIZE; i++) page.add(ItemStack.EMPTY);
+        return page;
+    }
+
+    private static ItemStack storedSlot(TestSingleplayerContext singleplayer, int page, int slot) {
+        return singleplayer.getServer().computeOnServer(server ->
+                InventoryStorage.read(server.getPlayerList().getPlayers().getFirst(), page).get(slot).copy());
+    }
+
+    private static void assertItemTotal(TestSingleplayerContext singleplayer, net.minecraft.world.item.Item item, int expected, String stage) {
+        int total = singleplayer.getServer().computeOnServer(server -> {
+            var player = server.getPlayerList().getPlayers().getFirst();
+            InventoryStorage.snapshotLive(player);
+            int sum = 0;
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++)
+                for (ItemStack stack : InventoryStorage.read(player, page)) if (stack.is(item)) sum += stack.getCount();
+            return sum;
+        });
+        assertTrue(total == expected, stage + " item total mismatch: expected=" + expected + ", actual=" + total);
+    }
+
+    private static void assertStackCount(TestSingleplayerContext singleplayer, net.minecraft.world.item.Item item, int expected, String stage) {
+        int stacks = singleplayer.getServer().computeOnServer(server -> {
+            var player = server.getPlayerList().getPlayers().getFirst();
+            InventoryStorage.snapshotLive(player);
+            int count = 0;
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++)
+                for (ItemStack stack : InventoryStorage.read(player, page)) if (stack.is(item)) count++;
+            return count;
+        });
+        assertTrue(stacks == expected, stage + " stack count mismatch: expected=" + expected + ", actual=" + stacks);
     }
 
     private static void prepareServer(TestSingleplayerContext singleplayer) {
