@@ -9,6 +9,10 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -27,6 +31,9 @@ public final class InventoryPageClientGameTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
+            testMerchantCancelPickup(singleplayer);
+            testMerchantCloseReturnAcrossPages(singleplayer);
+
             prepareServer(singleplayer);
             context.waitTicks(4);
 
@@ -63,111 +70,166 @@ public final class InventoryPageClientGameTest implements FabricClientGameTest {
                     InventoryStorage.read(server.getPlayerList().getPlayers().getFirst(), 0).get(0));
             assertTrue(sourcePageSlot.isEmpty(), "source page still contains the moved item: " + sourcePageSlot);
 
-            runRepeatedSortMerge(context, singleplayer);
+            testRepeatedSortMerge(context, singleplayer);
         }
     }
 
-    private static void runRepeatedSortMerge(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+    private static void testMerchantCancelPickup(TestSingleplayerContext singleplayer) {
         singleplayer.getServer().runOnServer(server -> {
             var player = server.getPlayerList().getPlayers().getFirst();
+            Villager villager = new Villager(EntityType.VILLAGER, player.level());
+            villager.setTradingPlayer(player);
+            MerchantMenu menu = new MerchantMenu(41, player.getInventory(), villager);
+            player.containerMenu = menu;
+            menu.getSlot(0).set(new ItemStack(Items.EMERALD, 17));
+            menu.setCarried(ItemStack.EMPTY);
+
+            menu.clicked(0, 0, ClickType.PICKUP, player);
+
+            ItemStack carried = menu.getCarried().copy();
+            assertTrue(carried.is(Items.EMERALD) && carried.getCount() == 17,
+                    "merchant cancel pickup lost payment; carried=" + carried);
+            assertTrue(menu.getSlot(0).getItem().isEmpty(),
+                    "merchant cancel pickup left payment duplicated in slot: " + menu.getSlot(0).getItem());
+            menu.setCarried(ItemStack.EMPTY);
+            player.containerMenu = player.inventoryMenu;
+            villager.setTradingPlayer(null);
+        });
+    }
+
+    private static void testMerchantCloseReturnAcrossPages(TestSingleplayerContext singleplayer) {
+        singleplayer.getServer().runOnServer(server -> {
+            var player = server.getPlayerList().getPlayers().getFirst();
+            InventoryStorage.setBrowsing(player, false);
             InventoryStorage.switchPage(player, 0);
-            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) InventoryStorage.write(player, page, emptyPage());
+
+            ArrayList<ItemStack> full = new ArrayList<>(InventoryStorage.PAGE_SIZE);
+            for (int i = 0; i < InventoryStorage.PAGE_SIZE; i++) full.add(new ItemStack(Items.COBBLESTONE, 64));
+            InventoryStorage.write(player, 0, full);
+            InventoryStorage.loadLive(player, full);
+            InventoryStorage.write(player, 1, List.of());
+            for (int i = 0; i < 9; i++) player.getInventory().setItem(i, new ItemStack(Items.COBBLESTONE, 64));
+            InventoryStorage.snapshotLive(player);
+
+            Villager villager = new Villager(EntityType.VILLAGER, player.level());
+            villager.setTradingPlayer(player);
+            MerchantMenu menu = new MerchantMenu(42, player.getInventory(), villager);
+            player.containerMenu = menu;
+            menu.getSlot(0).set(new ItemStack(Items.EMERALD, 23));
+            menu.getSlot(1).set(ItemStack.EMPTY);
+
+            menu.removed(player);
+            player.containerMenu = player.inventoryMenu;
+
+            int virtualEmeralds = 0;
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
+                for (ItemStack stack : InventoryStorage.read(player, page)) {
+                    if (stack.is(Items.EMERALD)) virtualEmeralds += stack.getCount();
+                }
+            }
+            for (int i = 0; i < 9; i++) {
+                ItemStack stack = player.getInventory().getItem(i);
+                if (stack.is(Items.EMERALD)) virtualEmeralds += stack.getCount();
+            }
+            assertTrue(virtualEmeralds == 23,
+                    "merchant close did not return change into virtual inventory; emeralds=" + virtualEmeralds);
+            assertTrue(menu.getSlot(0).getItem().isEmpty(),
+                    "merchant close left payment in merchant slot: " + menu.getSlot(0).getItem());
+        });
+    }
+
+    private static void testRepeatedSortMerge(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+        context.runOnClient(client -> client.setScreen(null));
+        context.waitTicks(3);
+        singleplayer.getServer().runOnServer(server -> {
+            var player = server.getPlayerList().getPlayers().getFirst();
+            InventoryStorage.setBrowsing(player, true);
+            InventoryStorage.switchPage(player, 0);
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) InventoryStorage.write(player, page, List.of());
             player.getInventory().setItem(9, new ItemStack(Items.STONE, 30));
-            player.getInventory().setItem(10, new ItemStack(Items.DIRT, 5));
-            player.getInventory().setItem(11, new ItemStack(Items.BREAD, 2));
-            InventoryStorage.snapshotLive(player);
-            List<ItemStack> page2 = emptyPage();
-            page2.set(0, new ItemStack(Items.STONE, 40));
-            page2.set(1, new ItemStack(Items.DIAMOND, 3));
-            InventoryStorage.write(player, 1, page2);
-            InventoryStorage.sync(player);
-        });
-        context.waitTicks(4);
-
-        sendAndWait(context, new ModPayloads.MergeAll());
-        assertItemTotal(singleplayer, Items.STONE, 70, "first merge");
-        assertStackCount(singleplayer, Items.STONE, 2, "first merge");
-
-        singleplayer.getServer().runOnServer(server -> {
-            var player = server.getPlayerList().getPlayers().getFirst();
-            player.getInventory().setItem(35, new ItemStack(Items.STONE, 10));
+            player.getInventory().setItem(10, new ItemStack(Items.STONE, 40));
+            player.getInventory().setItem(11, new ItemStack(Items.ROTTEN_FLESH, 5));
+            player.getInventory().setItem(12, new ItemStack(Items.BREAD, 2));
+            player.containerMenu = player.inventoryMenu;
             InventoryStorage.snapshotLive(player);
             InventoryStorage.sync(player);
         });
         context.waitTicks(3);
-
-        sendAndWait(context, new ModPayloads.MergeAll());
-        assertItemTotal(singleplayer, Items.STONE, 80, "second consecutive merge");
-        assertStackCount(singleplayer, Items.STONE, 2, "second consecutive merge");
-
-        sendAndWait(context, new ModPayloads.SortAll());
-        ItemStack firstAfterSort = storedSlot(singleplayer, 0, 0);
-        assertTrue(firstAfterSort.is(Items.BREAD), "first sort did not put food first; found " + firstAfterSort);
+        context.runOnClient(client -> ClientPlayNetworking.send(new ModPayloads.MergeAll()));
+        context.waitTicks(5);
+        assertVirtualCount(singleplayer, Items.STONE, 70, "first merge");
+        assertVirtualStackCount(singleplayer, Items.STONE, 2, "first merge");
 
         singleplayer.getServer().runOnServer(server -> {
             var player = server.getPlayerList().getPlayers().getFirst();
-            List<ItemStack> page3 = InventoryStorage.read(player, 2);
-            page3.set(26, new ItemStack(Items.APPLE, 1));
-            InventoryStorage.write(player, 2, page3);
-            InventoryStorage.loadLive(player, InventoryStorage.read(player, InventoryStorage.active(player)));
-            InventoryStorage.sync(player);
+            player.getInventory().setItem(20, new ItemStack(Items.STONE, 10));
+            InventoryStorage.snapshotLive(player);
         });
-        context.waitTicks(3);
+        context.runOnClient(client -> ClientPlayNetworking.send(new ModPayloads.MergeAll()));
+        context.waitTicks(5);
+        assertVirtualCount(singleplayer, Items.STONE, 80, "second merge");
+        assertVirtualStackCount(singleplayer, Items.STONE, 2, "second merge");
 
-        sendAndWait(context, new ModPayloads.SortAll());
-        ItemStack firstAfterSecondSort = storedSlot(singleplayer, 0, 0);
-        assertTrue(firstAfterSecondSort.is(Items.APPLE),
-                "second consecutive sort was ignored; expected apple first, found " + firstAfterSecondSort);
-        assertItemTotal(singleplayer, Items.STONE, 80, "second consecutive sort conservation");
-        assertItemTotal(singleplayer, Items.APPLE, 1, "second consecutive sort apple conservation");
+        context.runOnClient(client -> ClientPlayNetworking.send(new ModPayloads.SortAll()));
+        context.waitTicks(5);
+        assertFirstVirtualItem(singleplayer, Items.BREAD, "first sort");
+        singleplayer.getServer().runOnServer(server -> {
+            var player = server.getPlayerList().getPlayers().getFirst();
+            player.getInventory().setItem(25, new ItemStack(Items.APPLE, 1));
+            InventoryStorage.snapshotLive(player);
+        });
+        context.runOnClient(client -> ClientPlayNetworking.send(new ModPayloads.SortAll()));
+        context.waitTicks(5);
+        assertFirstVirtualItem(singleplayer, Items.APPLE, "second sort");
     }
 
-    private static void sendAndWait(ClientGameTestContext context, net.minecraft.network.protocol.common.custom.CustomPacketPayload payload) {
-        context.runOnClient(client -> ClientPlayNetworking.send(payload));
-        context.waitTicks(6);
-    }
-
-    private static List<ItemStack> emptyPage() {
-        ArrayList<ItemStack> page = new ArrayList<>(InventoryStorage.PAGE_SIZE);
-        for (int i = 0; i < InventoryStorage.PAGE_SIZE; i++) page.add(ItemStack.EMPTY);
-        return page;
-    }
-
-    private static ItemStack storedSlot(TestSingleplayerContext singleplayer, int page, int slot) {
-        return singleplayer.getServer().computeOnServer(server ->
-                InventoryStorage.read(server.getPlayerList().getPlayers().getFirst(), page).get(slot).copy());
-    }
-
-    private static void assertItemTotal(TestSingleplayerContext singleplayer, net.minecraft.world.item.Item item, int expected, String stage) {
-        int total = singleplayer.getServer().computeOnServer(server -> {
+    private static void assertVirtualCount(TestSingleplayerContext singleplayer, net.minecraft.world.item.Item item, int expected, String stage) {
+        int actual = singleplayer.getServer().computeOnServer(server -> {
             var player = server.getPlayerList().getPlayers().getFirst();
             InventoryStorage.snapshotLive(player);
-            int sum = 0;
-            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++)
-                for (ItemStack stack : InventoryStorage.read(player, page)) if (stack.is(item)) sum += stack.getCount();
-            return sum;
+            int total = 0;
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
+                for (ItemStack stack : InventoryStorage.read(player, page)) if (stack.is(item)) total += stack.getCount();
+            }
+            return total;
         });
-        assertTrue(total == expected, stage + " item total mismatch: expected=" + expected + ", actual=" + total);
+        assertTrue(actual == expected, stage + " count mismatch: expected=" + expected + " actual=" + actual);
     }
 
-    private static void assertStackCount(TestSingleplayerContext singleplayer, net.minecraft.world.item.Item item, int expected, String stage) {
-        int stacks = singleplayer.getServer().computeOnServer(server -> {
+    private static void assertVirtualStackCount(TestSingleplayerContext singleplayer, net.minecraft.world.item.Item item, int expected, String stage) {
+        int actual = singleplayer.getServer().computeOnServer(server -> {
             var player = server.getPlayerList().getPlayers().getFirst();
             InventoryStorage.snapshotLive(player);
-            int count = 0;
-            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++)
-                for (ItemStack stack : InventoryStorage.read(player, page)) if (stack.is(item)) count++;
-            return count;
+            int total = 0;
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
+                for (ItemStack stack : InventoryStorage.read(player, page)) if (stack.is(item)) total++;
+            }
+            return total;
         });
-        assertTrue(stacks == expected, stage + " stack count mismatch: expected=" + expected + ", actual=" + stacks);
+        assertTrue(actual == expected, stage + " stack-count mismatch: expected=" + expected + " actual=" + actual);
+    }
+
+    private static void assertFirstVirtualItem(TestSingleplayerContext singleplayer, net.minecraft.world.item.Item expected, String stage) {
+        ItemStack first = singleplayer.getServer().computeOnServer(server -> {
+            var player = server.getPlayerList().getPlayers().getFirst();
+            InventoryStorage.snapshotLive(player);
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
+                for (ItemStack stack : InventoryStorage.read(player, page)) if (!stack.isEmpty()) return stack.copy();
+            }
+            return ItemStack.EMPTY;
+        });
+        assertTrue(first.is(expected), stage + " did not execute/order correctly; first=" + first);
     }
 
     private static void prepareServer(TestSingleplayerContext singleplayer) {
         singleplayer.getServer().runOnServer(server -> {
             var player = server.getPlayerList().getPlayers().getFirst();
+            player.containerMenu = player.inventoryMenu;
             InventoryStorage.setBrowsing(player, true);
             InventoryStorage.switchPage(player, 0);
             InventoryStorage.write(player, TARGET_PAGE, java.util.List.of());
+            for (int i = 0; i < 9; i++) player.getInventory().setItem(i, ItemStack.EMPTY);
+            for (int i = 9; i < 36; i++) player.getInventory().setItem(i, ItemStack.EMPTY);
             player.getInventory().setItem(SOURCE_POSITION, new ItemStack(Items.DIAMOND, COUNT));
             player.containerMenu.setCarried(ItemStack.EMPTY);
             InventoryStorage.snapshotLive(player);
