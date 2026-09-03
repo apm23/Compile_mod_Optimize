@@ -186,8 +186,15 @@ public final class InventoryStorage {
     }
 
     public static void sync(ServerPlayer player) {
+        // Page swaps rewrite the 27 materialized inventory slots, but the cursor/carried stack
+        // belongs to the open menu rather than to those slots. Preserve it explicitly across the
+        // full-state broadcast so a page change can never make a carried item disappear or snap
+        // back to its source slot because of menu resynchronization.
+        ItemStack carried = player.containerMenu.getCarried().copy();
         player.getInventory().setChanged();
+        player.containerMenu.setCarried(carried.copy());
         player.containerMenu.broadcastFullState();
+        player.containerMenu.setCarried(carried);
     }
 
     private static List<ItemStack> normalizedCopy(List<ItemStack> source, int size) {
