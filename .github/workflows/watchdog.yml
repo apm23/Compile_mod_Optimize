@@ -104,7 +104,7 @@ jobs:
           grep -Fq 'client.player.containerMenu.setCarried(pendingPageCarried.copy())' dual/src/main/java/apm23/compilemod/dual/inventory/client/CustomHotbarInventoryClient.java
           grep -Fq 'private static boolean canReorganizePages(ServerPlayer p){return p.containerMenu==p.inventoryMenu;}' dual/src/main/java/apm23/compilemod/dual/inventory/core/CustomHotbarInventory.java
           ! grep -Fq 'canReorganizePages(ServerPlayer p){return p.containerMenu==p.inventoryMenu&&p.containerMenu.getCarried().isEmpty();}' dual/src/main/java/apm23/compilemod/dual/inventory/core/CustomHotbarInventory.java
-          grep -Fq 'custominventory$returnChangeAcrossPages' dual/src/main/java/apm23/compilemod/dual/inventory/mixin/MerchantMenuMixin.java
+          grep -Fq 'custominventory$returnMerchantStackAcrossPages' dual/src/main/java/apm23/compilemod/dual/inventory/mixin/MerchantMenuMixin.java
 
           if grep -Eq '^(com/tacz/|com/simibubi/create/)' /tmp/dual-jar.txt /tmp/server-jar.txt; then
             echo 'Forbidden TACZ/Create implementation classes were bundled.'
