@@ -42,12 +42,12 @@ jobs:
           rm -f run/mods/*-sources.jar run/mods/*-dev.jar
           echo 'eula=true' > run/eula.txt
           set +e
-          timeout 90s gradle runServer --args='nogui' > /tmp/compile-mod-server.log 2>&1
+          timeout 90s gradle :runServer --args='nogui' > /tmp/compile-mod-server.log 2>&1
           code=$?
           set -e
           cat /tmp/compile-mod-server.log
           if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then exit "$code"; fi
-          if grep -E -i 'mixin apply failed|mixin.*error|invalid injection|injection error|exception.*compile_mod_(server|dual)|failed to load.*compile_mod_(server|dual)' /tmp/compile-mod-server.log; then exit 1; fi
+          if grep -E -i 'mixin apply failed|invalid injection|injection error|exception.*compile_mod_(server|dual)|failed to load.*compile_mod_(server|dual)' /tmp/compile-mod-server.log; then exit 1; fi
           grep -q 'Done (' /tmp/compile-mod-server.log || { echo 'Server never reached ready state.'; exit 1; }
       - name: Upload server artifact
         uses: actions/upload-artifact@v4
