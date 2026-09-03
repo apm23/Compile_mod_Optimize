@@ -36,10 +36,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          server_jar=$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | head -n1)
-          dual_jar=$(find dual/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | head -n1)
+          server_jar=$(find build/libs -maxdepth 1 -type f -name 'compile-mod-server-*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' ! -name '*gametest*.jar' | head -n1)
+          dual_jar=$(find dual/build/libs -maxdepth 1 -type f -name 'compile-mod-dual-*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' ! -name '*gametest*.jar' | head -n1)
           test -n "$server_jar" && test -f "$server_jar"
           test -n "$dual_jar" && test -f "$dual_jar"
+          echo "Auditing production artifacts: $server_jar + $dual_jar"
           jar tf "$server_jar" > /tmp/server-jar.txt
           jar tf "$dual_jar" > /tmp/dual-jar.txt
 
@@ -52,13 +53,13 @@ jobs:
           require_entry /tmp/server-jar.txt 'apm23/compilemod/server/xp/mixin/ExperienceOrbMixin.class'
           require_entry /tmp/server-jar.txt 'compile_mod_server.mixins.json'
 
-          require_entry /tmp/dual-jar.txt 'com/anjas/custominventory/CustomHotbarInventory.class'
-          require_entry /tmp/dual-jar.txt 'com/anjas/custominventory/MerchantMenuMixin.class'
-          require_entry /tmp/dual-jar.txt 'com/anjas/custominventory/ServerPlaceRecipeMixin.class'
-          require_entry /tmp/dual-jar.txt 'com/anjas/custominventory/TaczGunSmithTableMenuMixin.class'
-          require_entry /tmp/dual-jar.txt 'com/anjas/godvillagers/GodHorseRuntime.class'
-          require_entry /tmp/dual-jar.txt 'com/anjas/godvillagers/StormcallRuntime.class'
-          require_entry /tmp/dual-jar.txt 'com/anjas/forceanvil/ForceAnvilMenuMixin.class'
+          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/inventory/core/CustomHotbarInventory.class'
+          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/inventory/mixin/MerchantMenuMixin.class'
+          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/inventory/mixin/ServerPlaceRecipeMixin.class'
+          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/inventory/mixin/TaczGunSmithTableMenuMixin.class'
+          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/functional/godvillager/GodHorseRuntime.class'
+          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/functional/godvillager/StormcallRuntime.class'
+          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/functional/forceanvil/mixin/ForceAnvilMenuMixin.class'
           require_entry /tmp/dual-jar.txt 'data/minecraft/tags/block/anvil.json'
           require_entry /tmp/dual-jar.txt 'custom_hotbar_inventory.mixins.json'
           require_entry /tmp/dual-jar.txt 'assets/linkedshulker/blockstates/linked_shulker_box.json'
@@ -75,9 +76,8 @@ jobs:
         run: |
           mkdir -p run/mods
           rm -f run/mods/*.jar
-          cp build/libs/*.jar run/mods/
-          cp dual/build/libs/*.jar run/mods/
-          rm -f run/mods/*-sources.jar run/mods/*-dev.jar
+          find build/libs -maxdepth 1 -type f -name 'compile-mod-server-*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' ! -name '*gametest*.jar' -exec cp {} run/mods/ \;
+          find dual/build/libs -maxdepth 1 -type f -name 'compile-mod-dual-*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' ! -name '*gametest*.jar' -exec cp {} run/mods/ \;
           echo 'eula=true' > run/eula.txt
           set +e
           timeout 90s gradle :runServer --args='nogui' > /tmp/compile-mod-server.log 2>&1
@@ -93,14 +93,16 @@ jobs:
         with:
           name: compile-mod-server-baseline
           path: |
-            build/libs/*.jar
+            build/libs/compile-mod-server-*.jar
             !build/libs/*-sources.jar
             !build/libs/*-dev.jar
+            !build/libs/*gametest*.jar
       - name: Upload dual artifact
         uses: actions/upload-artifact@v4
         with:
           name: compile-mod-dual-baseline
           path: |
-            dual/build/libs/*.jar
+            dual/build/libs/compile-mod-dual-*.jar
             !dual/build/libs/*-sources.jar
             !dual/build/libs/*-dev.jar
+            !dual/build/libs/*gametest*.jar
