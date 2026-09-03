@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "compile-mod-dual-gametest",
+  "version": "1.0.0",
+  "name": "Compile Mod Dual GameTest",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": [
+      "apm23.compilemod.dual.inventory.gametest.InventoryPageClientGameTest"
+    ]
+  }
+}
