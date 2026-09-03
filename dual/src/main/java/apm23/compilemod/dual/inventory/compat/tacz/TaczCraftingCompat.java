@@ -1,6 +1,5 @@
 package com.anjas.custominventory;
 
-import apm23.compilemod.dual.inventory.storage.InventoryStorage;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
@@ -22,9 +21,14 @@ public final class TaczCraftingCompat {
 
     private TaczCraftingCompat() {}
 
-    /** Replaces TACZ's normal workbench craft path when TACZ is present. */
+    /**
+     * Replaces TACZ's normal workbench craft path when TACZ is present.
+     * Returns true when the call belonged to a server player and was handled here.
+     */
     public static boolean handleCraft(Object menu, Identifier recipeId, Player player) {
-        if (!FabricLoader.getInstance().isModLoaded(TACZ_MOD_ID) || !(player instanceof ServerPlayer serverPlayer)) return false;
+        if (!FabricLoader.getInstance().isModLoaded(TACZ_MOD_ID) || !(player instanceof ServerPlayer serverPlayer)) {
+            return false;
+        }
         try {
             Method getRecipe = menu.getClass().getDeclaredMethod("getRecipe", Identifier.class);
             getRecipe.setAccessible(true);
@@ -33,18 +37,22 @@ public final class TaczCraftingCompat {
 
             Method getInputs = recipe.getClass().getMethod("getInputs");
             Method getOutput = recipe.getClass().getMethod("getOutput");
-            @SuppressWarnings("unchecked") List<Object> inputs = (List<Object>) getInputs.invoke(recipe);
+            @SuppressWarnings("unchecked")
+            List<Object> inputs = (List<Object>) getInputs.invoke(recipe);
             ItemStack output = ((ItemStack) getOutput.invoke(recipe)).copy();
             if (output.isEmpty()) return true;
 
             PagedView view = new PagedView(serverPlayer);
-            if (!serverPlayer.isCreative() && !reserveAndConsume(view, inputs)) return true;
+            if (!serverPlayer.isCreative() && !reserveAndConsume(view, inputs)) {
+                return true;
+            }
 
             ItemStack leftover = insert(view, output);
             view.commit();
             InventoryStorage.sync(serverPlayer);
             CustomHotbarInventory.sendHiddenRecipeState(serverPlayer);
 
+            // Preserve TACZ's old fallback semantics only when every virtual page is truly full.
             if (!leftover.isEmpty()) {
                 ItemEntity entity = new ItemEntity(serverPlayer.level(), serverPlayer.getX(), serverPlayer.getY() + 0.5, serverPlayer.getZ(), leftover);
                 entity.setPickUpDelay(0);
@@ -62,12 +70,18 @@ public final class TaczCraftingCompat {
 
     private static boolean reserveAndConsume(PagedView view, List<Object> inputs) throws ReflectiveOperationException {
         int[] reserved = new int[view.size()];
+        ArrayList<Ingredient> ingredients = new ArrayList<>(inputs.size());
+        ArrayList<Integer> neededCounts = new ArrayList<>(inputs.size());
+
+        // First pass is read-only: either every ingredient can be satisfied or nothing is changed.
         for (Object input : inputs) {
             Method getIngredient = input.getClass().getMethod("getIngredient");
             Method getCount = input.getClass().getMethod("getCount");
             Ingredient ingredient = (Ingredient) getIngredient.invoke(input);
             int needed = Math.max(0, ((Number) getCount.invoke(input)).intValue());
             if (ingredient == null) return false;
+            ingredients.add(ingredient);
+            neededCounts.add(needed);
 
             int remaining = needed;
             for (int slot : view.scanOrder()) {
@@ -96,6 +110,8 @@ public final class TaczCraftingCompat {
 
     private static ItemStack insert(PagedView view, ItemStack input) {
         ItemStack remaining = input.copy();
+
+        // Merge first, preferring the visible hotbar/current page before hidden pages.
         for (int slot : view.scanOrder()) {
             if (remaining.isEmpty()) break;
             ItemStack existing = view.get(slot);
@@ -106,6 +122,8 @@ public final class TaczCraftingCompat {
             existing.grow(moved);
             remaining.shrink(moved);
         }
+
+        // Then use empty slots anywhere in the 8-page virtual inventory.
         for (int slot : view.scanOrder()) {
             if (remaining.isEmpty()) break;
             if (!view.get(slot).isEmpty()) continue;
@@ -134,6 +152,7 @@ public final class TaczCraftingCompat {
         }
     }
 
+    /** Hotbar + current page + the seven hidden pages, with hidden-page writes committed atomically. */
     private static final class PagedView {
         private final ServerPlayer player;
         private final int activePage;
@@ -144,7 +163,10 @@ public final class TaczCraftingCompat {
             this.player = player;
             InventoryStorage.snapshotLive(player);
             this.activePage = InventoryStorage.active(player);
-            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) pages.add(new ArrayList<>(InventoryStorage.read(player, page)));
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
+                pages.add(new ArrayList<>(InventoryStorage.read(player, page)));
+            }
+
             this.scanOrder = new int[size()];
             int cursor = 0;
             for (int hotbar = 0; hotbar < 9; hotbar++) scanOrder[cursor++] = hotbar;
@@ -171,7 +193,10 @@ public final class TaczCraftingCompat {
 
         private void set(int slot, ItemStack stack) {
             if (slot < 0 || slot >= size()) return;
-            if (slot < 9) { player.getInventory().setItem(slot, stack); return; }
+            if (slot < 9) {
+                player.getInventory().setItem(slot, stack);
+                return;
+            }
             int linear = slot - 9;
             int page = linear / InventoryStorage.PAGE_SIZE;
             int index = linear % InventoryStorage.PAGE_SIZE;
@@ -180,7 +205,9 @@ public final class TaczCraftingCompat {
         }
 
         private void commit() {
-            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) if (page != activePage) InventoryStorage.write(player, page, pages.get(page));
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
+                if (page != activePage) InventoryStorage.write(player, page, pages.get(page));
+            }
             InventoryStorage.snapshotLive(player);
             player.getInventory().setChanged();
         }
