@@ -24,7 +24,6 @@ public final class InventoryPageClientGameTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-            singleplayer.getClientLevel().waitForChunksRender();
             prepareServer(singleplayer);
             context.waitTicks(4);
 
