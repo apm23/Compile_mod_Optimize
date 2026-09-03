@@ -9,18 +9,23 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.npc.Villager;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.trading.Merchant;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 
-@SuppressWarnings("UnstableApiUsage")
+@SuppressWarnings({"UnstableApiUsage", "unchecked"})
 public final class InventoryPageClientGameTest implements FabricClientGameTest {
     private static final int INVENTORY_IMAGE_WIDTH = 176;
     private static final int INVENTORY_IMAGE_HEIGHT = 166;
@@ -77,14 +82,14 @@ public final class InventoryPageClientGameTest implements FabricClientGameTest {
     private static void testMerchantCancelPickup(TestSingleplayerContext singleplayer) {
         singleplayer.getServer().runOnServer(server -> {
             var player = server.getPlayerList().getPlayers().getFirst();
-            Villager villager = new Villager(EntityType.VILLAGER, player.level());
-            villager.setTradingPlayer(player);
-            MerchantMenu menu = new MerchantMenu(41, player.getInventory(), villager);
+            TestMerchant merchant = new TestMerchant();
+            merchant.setTradingPlayer(player);
+            MerchantMenu menu = new MerchantMenu(41, player.getInventory(), merchant);
             player.containerMenu = menu;
             menu.getSlot(0).set(new ItemStack(Items.EMERALD, 17));
             menu.setCarried(ItemStack.EMPTY);
 
-            menu.clicked(0, 0, ClickType.PICKUP, player);
+            invokeVanillaPickup(menu, player, 0);
 
             ItemStack carried = menu.getCarried().copy();
             assertTrue(carried.is(Items.EMERALD) && carried.getCount() == 17,
@@ -93,13 +98,14 @@ public final class InventoryPageClientGameTest implements FabricClientGameTest {
                     "merchant cancel pickup left payment duplicated in slot: " + menu.getSlot(0).getItem());
             menu.setCarried(ItemStack.EMPTY);
             player.containerMenu = player.inventoryMenu;
-            villager.setTradingPlayer(null);
+            merchant.setTradingPlayer(null);
         });
     }
 
     private static void testMerchantCloseReturnAcrossPages(TestSingleplayerContext singleplayer) {
         singleplayer.getServer().runOnServer(server -> {
             var player = server.getPlayerList().getPlayers().getFirst();
+            player.containerMenu = player.inventoryMenu;
             InventoryStorage.setBrowsing(player, false);
             InventoryStorage.switchPage(player, 0);
 
@@ -111,9 +117,9 @@ public final class InventoryPageClientGameTest implements FabricClientGameTest {
             for (int i = 0; i < 9; i++) player.getInventory().setItem(i, new ItemStack(Items.COBBLESTONE, 64));
             InventoryStorage.snapshotLive(player);
 
-            Villager villager = new Villager(EntityType.VILLAGER, player.level());
-            villager.setTradingPlayer(player);
-            MerchantMenu menu = new MerchantMenu(42, player.getInventory(), villager);
+            TestMerchant merchant = new TestMerchant();
+            merchant.setTradingPlayer(player);
+            MerchantMenu menu = new MerchantMenu(42, player.getInventory(), merchant);
             player.containerMenu = menu;
             menu.getSlot(0).set(new ItemStack(Items.EMERALD, 23));
             menu.getSlot(1).set(ItemStack.EMPTY);
@@ -135,11 +141,36 @@ public final class InventoryPageClientGameTest implements FabricClientGameTest {
                     "merchant close did not return change into virtual inventory; emeralds=" + virtualEmeralds);
             assertTrue(menu.getSlot(0).getItem().isEmpty(),
                     "merchant close left payment in merchant slot: " + menu.getSlot(0).getItem());
+            merchant.setTradingPlayer(null);
         });
     }
 
+    /** Calls AbstractContainerMenu.clicked without compiling against the unstable click-type mapping. */
+    private static void invokeVanillaPickup(MerchantMenu menu, Player player, int slot) {
+        try {
+            Method clicked = null;
+            for (Method candidate : menu.getClass().getMethods()) {
+                if (candidate.getName().equals("clicked") && candidate.getParameterCount() == 4
+                        && candidate.getParameterTypes()[0] == int.class
+                        && candidate.getParameterTypes()[1] == int.class
+                        && Player.class.isAssignableFrom(candidate.getParameterTypes()[3])) {
+                    clicked = candidate;
+                    break;
+                }
+            }
+            if (clicked == null) throw new AssertionError("could not find vanilla clicked method");
+            Class<?> clickType = clicked.getParameterTypes()[2];
+            Field pickupField = clickType.getField("PICKUP");
+            assertTrue(Modifier.isStatic(pickupField.getModifiers()), "PICKUP click constant is not static");
+            Object pickup = pickupField.get(null);
+            clicked.invoke(menu, slot, 0, pickup, player);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("failed to invoke vanilla merchant PICKUP", e);
+        }
+    }
+
     private static void testRepeatedSortMerge(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
-        context.runOnClient(client -> client.setScreen(null));
+        context.getInput().pressKey(options -> options.keyInventory);
         context.waitTicks(3);
         singleplayer.getServer().runOnServer(server -> {
             var player = server.getPlayerList().getPlayers().getFirst();
@@ -280,5 +311,24 @@ public final class InventoryPageClientGameTest implements FabricClientGameTest {
 
     private static void assertTrue(boolean condition, String message) {
         if (!condition) throw new AssertionError(message);
+    }
+
+    private static final class TestMerchant implements Merchant {
+        private Player tradingPlayer;
+        private MerchantOffers offers = new MerchantOffers();
+        private int xp;
+
+        @Override public void setTradingPlayer(Player player) { this.tradingPlayer = player; }
+        @Override public Player getTradingPlayer() { return tradingPlayer; }
+        @Override public MerchantOffers getOffers() { return offers; }
+        @Override public void overrideOffers(MerchantOffers offers) { this.offers = offers; }
+        @Override public void notifyTrade(MerchantOffer offer) {}
+        @Override public void notifyTradeUpdated(ItemStack stack) {}
+        @Override public int getVillagerXp() { return xp; }
+        @Override public void overrideXp(int xp) { this.xp = xp; }
+        @Override public boolean showProgressBar() { return false; }
+        @Override public SoundEvent getNotifyTradeSound() { return null; }
+        @Override public boolean isClientSide() { return false; }
+        @Override public boolean stillValid(Player player) { return true; }
     }
 }
