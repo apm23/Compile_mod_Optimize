@@ -86,7 +86,9 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
     @Override
     public void startOpen(ContainerUser user) {
         if (viewers == 0 && level != null && !level.isClientSide()) {
-            level.playSound(null, worldPosition, SoundEvents.SHULKER_BOX_OPEN, SoundSource.BLOCKS, 0.65F, 1.25F);
+            // Short two-layer End resonance: distinct from a normal chest without becoming noisy.
+            level.playSound(null, worldPosition, SoundEvents.SHULKER_SHOOT, SoundSource.BLOCKS, 0.28F, 0.72F);
+            level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 0.24F, 1.62F);
         }
         viewers++;
     }
