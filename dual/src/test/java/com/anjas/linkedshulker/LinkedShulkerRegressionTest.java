@@ -30,19 +30,18 @@ final class LinkedShulkerRegressionTest {
             String path = "/assets/linkedshulker/models/block/linked_shulker_box_open_" + frame + ".json";
             assertFalse(resource(path).isBlank(), "missing frame " + frame);
         }
-
         String fullOpen = resource("/assets/linkedshulker/models/block/linked_shulker_box_open_7.json");
         assertTrue(fullOpen.contains("\"elements\""));
-        // Premium open frame must have several nested pieces, not just lower box + lid.
         assertTrue(count(fullOpen, "\"from\"") >= 8, "full-open model lost 3D interior detail");
-        // Lid is translated upward rather than rotated like a chest hinge.
         assertFalse(fullOpen.contains("\"rotation\""), "open model unexpectedly contains hinge rotation");
     }
 
     @Test
-    void itemTransformsStayInVanillaBlockScaleRange() throws IOException {
-        String item = resource("/assets/linkedshulker/models/item/linked_shulker_box.json");
-        assertTrue(item.contains("\"scale\": [0.625, 0.625, 0.625]"));
+    void itemTransformsStayCompactLikeNormalBlocks() throws IOException {
+        String item = resource("/assets/linkedshulker/models/item/linked_shulker_box.json").replace(" ", "");
+        assertTrue(item.contains("\"scale\":[0.58,0.58,0.58]"), "GUI scale drifted");
+        assertTrue(item.contains("\"scale\":[0.36,0.36,0.36]"), "first-person scale drifted");
+        assertTrue(item.contains("\"scale\":[0.34,0.34,0.34]"), "third-person scale drifted");
         assertTrue(item.contains("firstperson_righthand"));
         assertTrue(item.contains("thirdperson_righthand"));
     }
