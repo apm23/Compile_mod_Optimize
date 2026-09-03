@@ -71,14 +71,13 @@ jobs:
           require_entry /tmp/dual-jar.txt 'assets/linkedshulker/models/item/linked_shulker_box.json'
 
           # Keep unchanged interaction paths byte-for-byte locked to the proven standalone build.
-          # CustomHotbarInventory and MerchantMenuMixin intentionally diverge after the survival
-          # fixes below, so those are guarded by explicit invariants instead of stale SHA hashes.
+          # Client page handling, CustomHotbarInventory and MerchantMenuMixin intentionally diverge
+          # after targeted survival fixes, so those are guarded by explicit invariants instead.
           rm -rf /tmp/inventory-proven-audit
           mkdir -p /tmp/inventory-proven-audit
           (
             cd /tmp/inventory-proven-audit
             jar xf "$GITHUB_WORKSPACE/$dual_jar" \
-              com/anjas/custominventory/client/CustomHotbarInventoryClient.class \
               com/anjas/custominventory/client/HiddenRecipeContentsClient.class \
               com/anjas/custominventory/mixin/ServerPlaceRecipeMixin.class \
               com/anjas/custominventory/TaczCraftingCompat.class \
@@ -86,7 +85,6 @@ jobs:
               com/anjas/custominventory/mixin/TaczGunSmithTableMenuMixin.class
           )
           cat > /tmp/inventory-proven.sha256 <<'EOF'
-          244389b4c2b952ed70064d8d322d09397c40e2792acef09b67a81e8440a06d3b  /tmp/inventory-proven-audit/com/anjas/custominventory/client/CustomHotbarInventoryClient.class
           b01908c23b0881ca4ab57c149d8966e0c7dbdfd2f6663b96a726479d4ed92a44  /tmp/inventory-proven-audit/com/anjas/custominventory/client/HiddenRecipeContentsClient.class
           12f96d52094b1884817798ac8792b07a80f5123f3fdd97ac4372a946f0939a7b  /tmp/inventory-proven-audit/com/anjas/custominventory/mixin/ServerPlaceRecipeMixin.class
           2a4febaeefcc257bdadc07c304855663622a7056dba2b5221f9e045d8d949b90  /tmp/inventory-proven-audit/com/anjas/custominventory/TaczCraftingCompat.class
@@ -95,10 +93,12 @@ jobs:
           EOF
           sha256sum --check --strict /tmp/inventory-proven.sha256
 
-          # Survival-fix invariants: cursor stack survives full-state page sync, sort/merge is gated
-          # by the actual inventory menu rather than a transient browse flag, and merchant close
-          # has a paged change-return path before vanilla can drop the remainder.
+          # Survival-fix invariants: server preserves carried items through page sync, client keeps
+          # the carried item across the PageState acknowledgement, sort/merge is gated by the
+          # actual inventory menu, and merchant close has a paged change-return path.
           grep -Fq 'player.containerMenu.setCarried(carried.copy())' dual/src/main/java/apm23/compilemod/dual/inventory/api/InventoryStorage.java
+          grep -Fq 'pendingPageCarried=client.player==null?ItemStack.EMPTY:client.player.containerMenu.getCarried().copy()' dual/src/main/java/apm23/compilemod/dual/inventory/client/CustomHotbarInventoryClient.java
+          grep -Fq 'client.player.containerMenu.setCarried(pendingPageCarried.copy())' dual/src/main/java/apm23/compilemod/dual/inventory/client/CustomHotbarInventoryClient.java
           grep -Fq 'p.containerMenu==p.inventoryMenu&&p.containerMenu.getCarried().isEmpty()' dual/src/main/java/apm23/compilemod/dual/inventory/core/CustomHotbarInventory.java
           grep -Fq 'custominventory$returnChangeAcrossPages' dual/src/main/java/apm23/compilemod/dual/inventory/mixin/MerchantMenuMixin.java
 
