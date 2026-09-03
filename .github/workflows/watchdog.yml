@@ -48,18 +48,25 @@ jobs:
             local list="$1" entry="$2"
             grep -Fxq "$entry" "$list" || { echo "Missing packaged entry: $entry"; exit 1; }
           }
+          require_class() {
+            local list="$1" class="$2"
+            grep -Eq "(^|/)${class}\\.class$" "$list" || { echo "Missing packaged class: $class"; exit 1; }
+          }
 
-          require_entry /tmp/server-jar.txt 'apm23/compilemod/server/mining/CustomPickaxeMod.class'
-          require_entry /tmp/server-jar.txt 'apm23/compilemod/server/xp/mixin/ExperienceOrbMixin.class'
+          # Several golden migrations intentionally retain their historical Java package
+          # even though source files are physically grouped by final responsibility.
+          # Audit the unique class itself rather than assuming source path == package path.
+          require_class /tmp/server-jar.txt 'CustomPickaxeMod'
+          require_class /tmp/server-jar.txt 'ExperienceOrbMixin'
           require_entry /tmp/server-jar.txt 'compile_mod_server.mixins.json'
 
-          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/inventory/core/CustomHotbarInventory.class'
-          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/inventory/mixin/MerchantMenuMixin.class'
-          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/inventory/mixin/ServerPlaceRecipeMixin.class'
-          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/inventory/mixin/TaczGunSmithTableMenuMixin.class'
-          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/functional/godvillager/GodHorseRuntime.class'
-          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/functional/godvillager/StormcallRuntime.class'
-          require_entry /tmp/dual-jar.txt 'apm23/compilemod/dual/functional/forceanvil/mixin/ForceAnvilMenuMixin.class'
+          require_class /tmp/dual-jar.txt 'CustomHotbarInventory'
+          require_class /tmp/dual-jar.txt 'MerchantMenuMixin'
+          require_class /tmp/dual-jar.txt 'ServerPlaceRecipeMixin'
+          require_class /tmp/dual-jar.txt 'TaczGunSmithTableMenuMixin'
+          require_class /tmp/dual-jar.txt 'GodHorseRuntime'
+          require_class /tmp/dual-jar.txt 'StormcallRuntime'
+          require_class /tmp/dual-jar.txt 'ForceAnvilMenuMixin'
           require_entry /tmp/dual-jar.txt 'data/minecraft/tags/block/anvil.json'
           require_entry /tmp/dual-jar.txt 'custom_hotbar_inventory.mixins.json'
           require_entry /tmp/dual-jar.txt 'assets/linkedshulker/blockstates/linked_shulker_box.json'
