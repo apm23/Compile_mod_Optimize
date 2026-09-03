@@ -3,6 +3,7 @@ package com.anjas.custominventory.mixin;
 import com.anjas.custominventory.CustomHotbarInventory;
 import com.anjas.custominventory.InventoryStorage;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MerchantContainer;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.item.ItemStack;
@@ -42,25 +43,18 @@ public abstract class MerchantMenuMixin {
         int activePage = InventoryStorage.active(player);
         List<ItemStack> working = custominventory$snapshotVirtualInventory(player);
 
-        // First simulate returning anything already sitting in the two payment slots. If that
-        // cannot fit, preserve the live menu exactly as it is instead of deleting/moving items.
         if (!custominventory$insertFully(working, this.tradeContainer.getItem(0).copy())) return;
         if (!custominventory$insertFully(working, this.tradeContainer.getItem(1).copy())) return;
 
         MerchantOffer offer = this.trader.getOffers().get(newTradeIndex);
-        int requiredA = offer.getCostA().getCount(); // includes demand/reputation/special-price changes
+        int requiredA = offer.getCostA().getCount();
         int requiredB = offer.getCostB().getCount();
 
-        // Atomic preflight uses exact required amounts. Nothing live is touched here. This keeps
-        // the previous safety fix: if A exists but B does not, repeated clicks consume/move zero.
         List<ItemStack> preflight = custominventory$copyStacks(working);
         if (custominventory$extractExact(preflight, offer.getItemCostA(), requiredA) == null) return;
         if (offer.getItemCostB().isPresent()
                 && custominventory$extractExact(preflight, offer.getItemCostB().get(), requiredB) == null) return;
 
-        // After validation, imitate vanilla autofill rather than extracting only the price. Vanilla
-        // moves as much of the chosen compatible variant as fits in one payment stack. The trade
-        // then shrinks only its price, leaving the remainder visibly in the payment slot as change.
         ItemStack paymentA = custominventory$extractPaymentStack(
                 working, offer.getItemCostA(), requiredA);
         if (paymentA == null) return;
@@ -72,10 +66,39 @@ public abstract class MerchantMenuMixin {
             if (paymentB == null) return;
         }
 
-        // All preconditions passed: this is the only point at which live state is mutated.
         custominventory$commitVirtualInventory(player, activePage, working);
         this.tradeContainer.setItem(0, paymentA);
         this.tradeContainer.setItem(1, paymentB);
+        InventoryStorage.sync(player);
+        CustomHotbarInventory.sendHiddenRecipeState(player);
+    }
+
+    /**
+     * Vanilla MerchantMenu only returns remaining payment-slot items to the materialized inventory
+     * when the menu closes. If that page is full it drops the change, even when another virtual
+     * page still has room. Pre-empt that close path with the same merge-first virtual insertion
+     * used by paged trading, then clear the payment slots so vanilla has nothing left to drop.
+     */
+    @Inject(method = "removed", at = @At("HEAD"))
+    private void custominventory$returnChangeAcrossPages(Player closingPlayer, CallbackInfo ci) {
+        if (!(closingPlayer instanceof ServerPlayer player)) return;
+
+        ItemStack first = this.tradeContainer.getItem(0).copy();
+        ItemStack second = this.tradeContainer.getItem(1).copy();
+        if (first.isEmpty() && second.isEmpty()) return;
+
+        InventoryStorage.snapshotLive(player);
+        int activePage = InventoryStorage.active(player);
+        List<ItemStack> working = custominventory$snapshotVirtualInventory(player);
+
+        // Atomic close: either both payment/change stacks fit somewhere in the virtual inventory,
+        // or leave the menu untouched and let vanilla use its normal fallback behavior.
+        if (!custominventory$insertFully(working, first.copy())) return;
+        if (!custominventory$insertFully(working, second.copy())) return;
+
+        custominventory$commitVirtualInventory(player, activePage, working);
+        this.tradeContainer.setItem(0, ItemStack.EMPTY);
+        this.tradeContainer.setItem(1, ItemStack.EMPTY);
         InventoryStorage.sync(player);
         CustomHotbarInventory.sendHiddenRecipeState(player);
     }
@@ -111,7 +134,6 @@ public abstract class MerchantMenuMixin {
             if (page == activePage) InventoryStorage.loadLive(player, pageStacks);
             else InventoryStorage.write(player, page, pageStacks);
         }
-        // Keep the attachment copy of the materialized page coherent as well.
         InventoryStorage.snapshotLive(player);
     }
 
@@ -148,11 +170,6 @@ public abstract class MerchantMenuMixin {
         return custominventory$extractVariant(slots, cost, representative, required);
     }
 
-    /**
-     * Fill a merchant payment slot the vanilla way: once a satisfying variant is selected, move
-     * as much of that variant as possible up to its normal max stack size. This deliberately moves
-     * more than the price when available so MerchantResultSlot can leave the unspent remainder.
-     */
     @Unique
     private static ItemStack custominventory$extractPaymentStack(List<ItemStack> slots, ItemCost cost, int required) {
         if (required <= 0) return ItemStack.EMPTY;
