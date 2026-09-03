@@ -1,6 +1,5 @@
 package com.anjas.custominventory;
 
-import apm23.compilemod.dual.inventory.storage.InventoryStorage;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.resources.Identifier;
@@ -65,11 +64,7 @@ public final class TaczAmmoCompat {
                         Object item = stack.getItem();
                         if (ammoClass.isInstance(item) && Boolean.TRUE.equals(ammoMatches.invoke(item, gun, stack))) {
                             int take = Math.min(remaining, stack.getCount());
-                            if (take > 0) {
-                                stack.shrink(take);
-                                view.markMutated();
-                                remaining -= take;
-                            }
+                            if (take > 0) { stack.shrink(take); view.markMutated(); remaining -= take; }
                             continue;
                         }
                         if (ammoBoxClass.isInstance(item) && Boolean.TRUE.equals(boxMatches.invoke(item, gun, stack))) {
@@ -79,17 +74,12 @@ public final class TaczAmmoCompat {
                                 int after = count - take;
                                 setBoxCount.invoke(item, stack, after);
                                 if (after <= 0) setBoxId.invoke(item, stack, emptyAmmoId);
-                                view.markMutated();
-                                remaining -= take;
+                                view.markMutated(); remaining -= take;
                             }
                         }
                     }
                     int consumed = requested - remaining;
-                    if (view.mutated) {
-                        view.commit();
-                        InventoryStorage.sync(player);
-                        CustomHotbarInventory.sendHiddenRecipeState(player);
-                    }
+                    if (view.mutated) { view.commit(); InventoryStorage.sync(player); CustomHotbarInventory.sendHiddenRecipeState(player); }
                     return consumed;
                 }
                 if (name.equals("toString")) return "CustomHotbarInventoryTaczAmmoSource";
@@ -114,15 +104,12 @@ public final class TaczAmmoCompat {
         }
     }
 
-    private static boolean hasCompatible(List<ItemStack> stacks, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass,
-                                         Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
+    private static boolean hasCompatible(List<ItemStack> stacks, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass, Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
         for (ItemStack stack : stacks) {
             if (stack == null || stack.isEmpty()) continue;
             Object item = stack.getItem();
             if (ammoClass.isInstance(item) && Boolean.TRUE.equals(ammoMatches.invoke(item, gun, stack))) return true;
-            if (ammoBoxClass.isInstance(item)
-                    && Boolean.TRUE.equals(boxMatches.invoke(item, gun, stack))
-                    && ((Number) boxCount.invoke(item, stack)).intValue() > 0) return true;
+            if (ammoBoxClass.isInstance(item) && Boolean.TRUE.equals(boxMatches.invoke(item, gun, stack)) && ((Number) boxCount.invoke(item, stack)).intValue() > 0) return true;
         }
         return false;
     }
@@ -132,8 +119,7 @@ public final class TaczAmmoCompat {
         for (int i = 0; i < 36; i++) all.add(player.getInventory().getItem(i));
         try {
             Class<?> cache = Class.forName("com.anjas.custominventory.client.HiddenRecipeContentsClient");
-            @SuppressWarnings("unchecked")
-            List<ItemStack> hidden = (List<ItemStack>) cache.getMethod("snapshot").invoke(null);
+            @SuppressWarnings("unchecked") List<ItemStack> hidden = (List<ItemStack>) cache.getMethod("snapshot").invoke(null);
             all.addAll(hidden);
         } catch (ReflectiveOperationException | LinkageError ignored) {}
         return all;
@@ -144,38 +130,23 @@ public final class TaczAmmoCompat {
         private final int activePage;
         private final List<List<ItemStack>> pages = new ArrayList<>(InventoryStorage.PAGE_COUNT);
         private boolean mutated;
-
         private ServerAmmoView(ServerPlayer player) {
-            this.player = player;
-            InventoryStorage.snapshotLive(player);
-            this.activePage = InventoryStorage.active(player);
+            this.player = player; InventoryStorage.snapshotLive(player); this.activePage = InventoryStorage.active(player);
             for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) pages.add(new ArrayList<>(InventoryStorage.read(player, page)));
         }
-
         private int size() { return 9 + InventoryStorage.PAGE_COUNT * InventoryStorage.PAGE_SIZE; }
         private void markMutated() { mutated = true; }
-
         private ItemStack get(int slot) {
             if (slot < 0 || slot >= size()) return ItemStack.EMPTY;
             if (slot < 9) return player.getInventory().getItem(slot);
-            int linear = slot - 9;
-            int page = linear / InventoryStorage.PAGE_SIZE;
-            int index = linear % InventoryStorage.PAGE_SIZE;
+            int linear = slot - 9, page = linear / InventoryStorage.PAGE_SIZE, index = linear % InventoryStorage.PAGE_SIZE;
             if (page == activePage) return player.getInventory().getItem(InventoryStorage.MAIN_START + index);
             return pages.get(page).get(index);
         }
-
-        private List<ItemStack> snapshot() {
-            ArrayList<ItemStack> out = new ArrayList<>(size());
-            for (int i = 0; i < size(); i++) out.add(get(i));
-            return out;
-        }
-
+        private List<ItemStack> snapshot() { ArrayList<ItemStack> out = new ArrayList<>(size()); for (int i = 0; i < size(); i++) out.add(get(i)); return out; }
         private void commit() {
             InventoryStorage.snapshotLive(player);
-            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
-                if (page != activePage) InventoryStorage.write(player, page, pages.get(page));
-            }
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) if (page != activePage) InventoryStorage.write(player, page, pages.get(page));
             player.getInventory().setChanged();
         }
     }
