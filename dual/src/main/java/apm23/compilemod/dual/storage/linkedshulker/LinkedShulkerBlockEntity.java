@@ -7,6 +7,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.MenuProvider;
@@ -43,17 +45,13 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
     public String channelLabel() { return channelLabel; }
 
     private NonNullList<ItemStack> items() {
-        if (level instanceof ServerLevel serverLevel) {
-            return ChannelStorageData.get(serverLevel.getServer()).inventory(channel);
-        }
+        if (level instanceof ServerLevel serverLevel) return ChannelStorageData.get(serverLevel.getServer()).inventory(channel);
         return fallback;
     }
 
     private void changed() {
         setChanged();
-        if (level instanceof ServerLevel serverLevel) {
-            ChannelStorageData.get(serverLevel.getServer()).setDirty();
-        }
+        if (level instanceof ServerLevel serverLevel) ChannelStorageData.get(serverLevel.getServer()).setDirty();
     }
 
     @Override public int getContainerSize() { return ChannelStorageData.SIZE; }
@@ -86,6 +84,10 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
 
     @Override
     public void startOpen(ContainerUser user) {
+        if (viewers == 0 && level != null && !level.isClientSide()) {
+            // One short, slightly brighter shulker click per opening session; no looping audio.
+            level.playSound(null, worldPosition, SoundEvents.SHULKER_BOX_OPEN, SoundSource.BLOCKS, 0.65F, 1.25F);
+        }
         viewers++;
     }
 
@@ -99,9 +101,7 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
         int target = be.viewers > 0 ? LinkedShulkerBlock.MAX_OPEN_FRAME : 0;
         if (be.animationFrame == target) return;
         be.animationFrame += be.animationFrame < target ? 1 : -1;
-        if (state.hasProperty(LinkedShulkerBlock.OPEN_FRAME)) {
-            level.setBlock(pos, state.setValue(LinkedShulkerBlock.OPEN_FRAME, be.animationFrame), 3);
-        }
+        if (state.hasProperty(LinkedShulkerBlock.OPEN_FRAME)) level.setBlock(pos, state.setValue(LinkedShulkerBlock.OPEN_FRAME, be.animationFrame), 3);
     }
 
     @Override
@@ -131,7 +131,9 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
         super.loadAdditional(input);
         String savedChannel = input.read("channel", Codec.STRING).orElse("default");
         String savedLabel = input.read("channel_label", Codec.STRING).orElse(savedChannel);
-        channel = ChannelStorageData.normalize(savedChannel);
         channelLabel = ChannelStorageData.displayName(savedLabel);
+        // Old block entities stored a lower-case channel plus the original case-sensitive label.
+        // Prefer the label so ChannelStorageData can lazily migrate the old lower-case contents.
+        channel = ChannelStorageData.normalize(channelLabel);
     }
 }
