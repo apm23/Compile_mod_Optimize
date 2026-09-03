@@ -5,6 +5,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -85,7 +86,6 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
     @Override
     public void startOpen(ContainerUser user) {
         if (viewers == 0 && level != null && !level.isClientSide()) {
-            // One short, slightly brighter shulker click per opening session; no looping audio.
             level.playSound(null, worldPosition, SoundEvents.SHULKER_BOX_OPEN, SoundSource.BLOCKS, 0.65F, 1.25F);
         }
         viewers++;
@@ -101,7 +101,17 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
         int target = be.viewers > 0 ? LinkedShulkerBlock.MAX_OPEN_FRAME : 0;
         if (be.animationFrame == target) return;
         be.animationFrame += be.animationFrame < target ? 1 : -1;
-        if (state.hasProperty(LinkedShulkerBlock.OPEN_FRAME)) level.setBlock(pos, state.setValue(LinkedShulkerBlock.OPEN_FRAME, be.animationFrame), 3);
+
+        // One tiny End-like burst only when opening starts. No per-tick emitter: cheap on laptops/servers.
+        if (be.animationFrame == 1 && target > 0 && level instanceof ServerLevel server) {
+            server.sendParticles(ParticleTypes.PORTAL,
+                pos.getX() + 0.5D, pos.getY() + 0.62D, pos.getZ() + 0.5D,
+                6, 0.28D, 0.08D, 0.28D, 0.015D);
+        }
+
+        if (state.hasProperty(LinkedShulkerBlock.OPEN_FRAME)) {
+            level.setBlock(pos, state.setValue(LinkedShulkerBlock.OPEN_FRAME, be.animationFrame), 3);
+        }
     }
 
     @Override
@@ -132,8 +142,6 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
         String savedChannel = input.read("channel", Codec.STRING).orElse("default");
         String savedLabel = input.read("channel_label", Codec.STRING).orElse(savedChannel);
         channelLabel = ChannelStorageData.displayName(savedLabel);
-        // Old block entities stored a lower-case channel plus the original case-sensitive label.
-        // Prefer the label so ChannelStorageData can lazily migrate the old lower-case contents.
         channel = ChannelStorageData.normalize(channelLabel);
     }
 }
