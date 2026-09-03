@@ -36,19 +36,22 @@ final class FeatureWiringRegressionTest {
 
     @Test
     void stormcallAndGodHorseRuntimeClassesArePresent() throws Exception {
-        assertNotNull(Class.forName("com.anjas.godvillagers.StormcallRuntime"));
-        assertNotNull(Class.forName("com.anjas.godvillagers.GodHorseRuntime"));
-        assertNotNull(Class.forName("apm23.compilemod.dual.functional.godvillager.GodVillagerRegistry"));
+        ClassLoader loader = FeatureWiringRegressionTest.class.getClassLoader();
+        assertNotNull(Class.forName("com.anjas.godvillagers.StormcallRuntime", false, loader));
+        assertNotNull(Class.forName("com.anjas.godvillagers.GodHorseRuntime", false, loader));
+        assertNotNull(Class.forName("apm23.compilemod.dual.functional.godvillager.GodVillagerRegistry", false, loader));
     }
 
     @Test
     void linkedShulkerSoundAndParticleCodeArePresent() throws Exception {
-        Class<?> be = Class.forName("com.anjas.linkedshulker.LinkedShulkerBlockEntity");
-        assertNotNull(be.getDeclaredMethod("startOpen", net.minecraft.world.entity.ContainerUser.class));
-        assertNotNull(be.getDeclaredMethod("serverTick", net.minecraft.world.level.Level.class,
-            net.minecraft.core.BlockPos.class,
-            net.minecraft.world.level.block.state.BlockState.class,
-            be));
+        ClassLoader loader = FeatureWiringRegressionTest.class.getClassLoader();
+        Class<?> be = Class.forName("com.anjas.linkedshulker.LinkedShulkerBlockEntity", false, loader);
+        Class<?> user = Class.forName("net.minecraft.world.entity.ContainerUser", false, loader);
+        Class<?> level = Class.forName("net.minecraft.world.level.Level", false, loader);
+        Class<?> pos = Class.forName("net.minecraft.core.BlockPos", false, loader);
+        Class<?> state = Class.forName("net.minecraft.world.level.block.state.BlockState", false, loader);
+        assertNotNull(be.getDeclaredMethod("startOpen", user));
+        assertNotNull(be.getDeclaredMethod("serverTick", level, pos, state, be));
     }
 
     private static String resource(String path) throws IOException {
