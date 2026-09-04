@@ -7,6 +7,7 @@
   "entrypoints": {
     "fabric-client-gametest": [
       "apm23.compilemod.dual.inventory.gametest.InventoryPageClientGameTest",
+      "apm23.compilemod.dual.inventory.gametest.GlobalSortMergeClientGameTest",
       "apm23.compilemod.dual.linkedshulker.gametest.LinkedShulkerClientGameTest"
     ]
   }
