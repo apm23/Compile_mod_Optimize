@@ -21,10 +21,9 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
             context.waitTicks(4);
             context.runOnClient(client -> {
                 if (client.player == null) throw new AssertionError("client player missing");
-                CustomHotbarInventoryClient input = new CustomHotbarInventoryClient();
                 InventoryScreen screen = new InventoryScreen(client.player);
-                boolean handled = input.testHandleGuiInput(screen, input.testMergeKey());
-                if (!handled) throw new AssertionError("merge key was not handled by GUI input path");
+                boolean handled = CustomHotbarInventoryClient.testHandleActiveGuiInput(screen, false);
+                if (!handled) throw new AssertionError("merge key was not handled by active GUI input path");
             });
             context.waitTicks(6);
             verifyMergedAcrossAllEightPages(singleplayer);
@@ -33,10 +32,9 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
             context.waitTicks(4);
             context.runOnClient(client -> {
                 if (client.player == null) throw new AssertionError("client player missing");
-                CustomHotbarInventoryClient input = new CustomHotbarInventoryClient();
                 InventoryScreen screen = new InventoryScreen(client.player);
-                boolean handled = input.testHandleGuiInput(screen, input.testSortKey());
-                if (!handled) throw new AssertionError("sort key was not handled by GUI input path");
+                boolean handled = CustomHotbarInventoryClient.testHandleActiveGuiInput(screen, true);
+                if (!handled) throw new AssertionError("sort key was not handled by active GUI input path");
             });
             context.waitTicks(6);
             verifySortedAcrossAllEightPages(singleplayer);
@@ -49,7 +47,6 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
             player.containerMenu = player.inventoryMenu;
             InventoryStorage.setBrowsing(player, true);
             InventoryStorage.switchPage(player, 0);
-
             for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
                 ArrayList<ItemStack> stacks = emptyPage();
                 stacks.set(0, new ItemStack(Items.STONE, 8));
@@ -69,10 +66,7 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
             int nonEmptyOutsidePage0 = 0;
             for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
                 for (ItemStack stack : InventoryStorage.read(player, page)) {
-                    if (stack.is(Items.STONE)) {
-                        totalStone += stack.getCount();
-                        stoneStacks++;
-                    }
+                    if (stack.is(Items.STONE)) { totalStone += stack.getCount(); stoneStacks++; }
                     if (page > 0 && !stack.isEmpty()) nonEmptyOutsidePage0++;
                 }
             }
@@ -88,16 +82,7 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
             player.containerMenu = player.inventoryMenu;
             InventoryStorage.setBrowsing(player, true);
             InventoryStorage.switchPage(player, 0);
-            var items = List.of(
-                    Items.ROTTEN_FLESH,
-                    Items.REDSTONE,
-                    Items.DIAMOND,
-                    Items.IRON_PICKAXE,
-                    Items.BREAD,
-                    Items.BONE,
-                    Items.APPLE,
-                    Items.EMERALD
-            );
+            var items = List.of(Items.ROTTEN_FLESH,Items.REDSTONE,Items.DIAMOND,Items.IRON_PICKAXE,Items.BREAD,Items.BONE,Items.APPLE,Items.EMERALD);
             for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
                 ArrayList<ItemStack> stacks = emptyPage();
                 stacks.set(26, new ItemStack(items.get(page), 1));
@@ -140,7 +125,5 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
         return stacks;
     }
 
-    private static void assertTrue(boolean condition, String message) {
-        if (!condition) throw new AssertionError(message);
-    }
+    private static void assertTrue(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
 }
