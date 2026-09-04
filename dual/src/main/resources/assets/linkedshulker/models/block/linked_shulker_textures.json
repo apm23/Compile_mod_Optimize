@@ -1,1 +1,1 @@
-{"textures":{"body":"minecraft:block/polished_blackstone_bricks","gold":"minecraft:block/gold_block","crystal":"minecraft:block/amethyst_block","crystal2":"minecraft:block/budding_amethyst","inner":"minecraft:block/purple_concrete","particle":"minecraft:block/polished_blackstone_bricks"}}
+{"textures":{"body":"linkedshulker:block/premium_body","gold":"linkedshulker:block/premium_gold","crystal":"linkedshulker:block/premium_crystal","crystal2":"linkedshulker:block/premium_crystal","inner":"linkedshulker:block/premium_inner","particle":"linkedshulker:block/premium_body"}}
