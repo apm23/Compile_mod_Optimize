@@ -48,6 +48,34 @@ public class GlobalMendingGameTest {
     }
 
     @GameTest
+    public void multiplayerPlayersRepairIndependently(GameTestHelper helper) {
+        ServerPlayer playerA = (ServerPlayer) helper.makeMockServerPlayer(GameType.SURVIVAL);
+        ServerPlayer playerB = (ServerPlayer) helper.makeMockServerPlayer(GameType.SURVIVAL);
+        var enchantments = playerA.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+        var mending = enchantments.getOrThrow(Enchantments.MENDING);
+
+        ItemStack toolA = new ItemStack(Items.DIAMOND_PICKAXE);
+        toolA.enchant(mending, 1);
+        toolA.setDamageValue(8);
+        ItemStack toolB = new ItemStack(Items.DIAMOND_AXE);
+        toolB.enchant(mending, 1);
+        toolB.setDamageValue(8);
+        playerA.getInventory().setItem(0, toolA);
+        playerB.getInventory().setItem(0, toolB);
+
+        int bBefore = toolB.getDamageValue();
+        new ExperienceOrb(playerA.level(), playerA.getX(), playerA.getY(), playerA.getZ(), 4).playerTouch(playerA);
+        helper.assertTrue(toolA.getDamageValue() < 8, "Player A did not receive Global Mending repair");
+        helper.assertTrue(toolB.getDamageValue() == bBefore, "Player A XP incorrectly repaired Player B item");
+
+        int aAfterOwnXp = toolA.getDamageValue();
+        new ExperienceOrb(playerB.level(), playerB.getX(), playerB.getY(), playerB.getZ(), 4).playerTouch(playerB);
+        helper.assertTrue(toolB.getDamageValue() < bBefore, "Player B did not receive Global Mending repair");
+        helper.assertTrue(toolA.getDamageValue() == aAfterOwnXp, "Player B XP incorrectly repaired Player A item");
+        helper.succeed();
+    }
+
+    @GameTest
     public void remoteMiningBreaksTargetOreAndDropsReward(GameTestHelper helper) {
         ServerPlayer player = (ServerPlayer) helper.makeMockServerPlayer(GameType.SURVIVAL);
         ServerLevel level = (ServerLevel) player.level();
