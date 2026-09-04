@@ -28,6 +28,7 @@ import java.util.List;
 public final class CustomHotbarInventoryClient implements ClientModInitializer {
     private static final KeyMapping.Category CATEGORY=KeyMapping.Category.register(CustomHotbarInventory.id("controls"));
     private static final long CYCLE_DEBOUNCE_NANOS=180_000_000L;
+    private static CustomHotbarInventoryClient ACTIVE;
     private final KeyMapping cycleInventory=KeyMappingHelper.registerKeyMapping(new KeyMapping("key.custom_hotbar_inventory.cycle_inventory",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_V,CATEGORY));
     private final KeyMapping swapHotbar=KeyMappingHelper.registerKeyMapping(new KeyMapping("key.custom_hotbar_inventory.swap_hotbar",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_B,CATEGORY));
     private final KeyMapping sortAll=KeyMappingHelper.registerKeyMapping(new KeyMapping("key.custom_hotbar_inventory.sort_all",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_N,CATEGORY));
@@ -37,6 +38,8 @@ public final class CustomHotbarInventoryClient implements ClientModInitializer {
     private final List<Button> pageButtons=new ArrayList<>(8);
     private ItemStack pendingPageCarried=ItemStack.EMPTY;
     private int visiblePage=0;
+
+    public CustomHotbarInventoryClient(){ACTIVE=this;}
 
     @Override public void onInitializeClient(){
         CustomHotbarInventory.LOGGER.info("Custom Hotbar Inventory client initialized");
@@ -82,9 +85,11 @@ public final class CustomHotbarInventoryClient implements ClientModInitializer {
         }
         return false;
     }
-    public boolean testHandleGuiInput(Screen screen, InputConstants.Key input){return handleGuiInput(screen,input);}
-    public InputConstants.Key testSortKey(){return KeyMappingHelper.getBoundKeyOf(sortAll);}
-    public InputConstants.Key testMergeKey(){return KeyMappingHelper.getBoundKeyOf(mergeAll);}
+    public static boolean testHandleActiveGuiInput(Screen screen, boolean sort){
+        CustomHotbarInventoryClient active=ACTIVE;
+        if(active==null)throw new IllegalStateException("Custom Hotbar Inventory client instance not initialized");
+        return active.handleGuiInput(screen,KeyMappingHelper.getBoundKeyOf(sort?active.sortAll:active.mergeAll));
+    }
     private void consumeHotbarOutsideGui(){boolean clicked=false;while(swapHotbar.consumeClick())clicked=true;if(clicked&&hotbarDebounce.tryAcquire(System.nanoTime()))sendIfPossible(new ModPayloads.SwapHotbar(),ModPayloads.SwapHotbar.TYPE);}
     private static boolean matches(KeyMapping m,InputConstants.Key input){return KeyMappingHelper.getBoundKeyOf(m).equals(input);} private static void drain(KeyMapping m){while(m.consumeClick()){} }
     private static boolean isManagedContainer(Screen s){return s instanceof AbstractContainerScreen<?>;}
