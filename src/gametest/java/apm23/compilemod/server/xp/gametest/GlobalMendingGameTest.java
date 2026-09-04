@@ -1,14 +1,19 @@
 package apm23.compilemod.server.xp.gametest;
 
+import com.apm23.custompickaxe.RemoteMiningManager;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
 
 public class GlobalMendingGameTest {
     @GameTest
@@ -39,6 +44,25 @@ public class GlobalMendingGameTest {
         helper.assertTrue(pickaxe.getDamageValue() == 0, "First Mending item was not fully repaired");
         helper.assertTrue(chestplate.getDamageValue() == 0, "Second Mending item was not fully repaired");
         helper.assertTrue(player.totalExperience > xpBefore, "XP remainder did not reach player");
+        helper.succeed();
+    }
+
+    @GameTest
+    public void remoteMiningBreaksTargetOreAndDropsReward(GameTestHelper helper) {
+        ServerPlayer player = (ServerPlayer) helper.makeMockServerPlayer(GameType.SURVIVAL);
+        ServerLevel level = (ServerLevel) player.level();
+        BlockPos origin = helper.absolutePos(new BlockPos(2, 2, 2));
+        player.setPos(origin.getX() + 0.5D, origin.getY(), origin.getZ() + 0.5D);
+        level.setBlockAndUpdate(origin, Blocks.DIAMOND_ORE.defaultBlockState());
+
+        helper.assertTrue(RemoteMiningManager.isSupportedType("diamond"), "diamond remote-mining target is not registered");
+        RemoteMiningManager.start(player, origin, "diamond", 8);
+        RemoteMiningManager.tick(level);
+
+        helper.assertTrue(level.getBlockState(origin).isAir(), "remote mining did not break target diamond ore");
+        boolean diamondReward = level.getEntitiesOfClass(ItemEntity.class, player.getBoundingBox().inflate(8.0D)).stream()
+                .anyMatch(entity -> entity.getItem().is(Items.DIAMOND) && entity.getItem().getCount() >= 1);
+        helper.assertTrue(diamondReward, "remote mining did not emit diamond reward");
         helper.succeed();
     }
 }
