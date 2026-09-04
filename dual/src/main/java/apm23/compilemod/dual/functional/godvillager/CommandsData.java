@@ -47,7 +47,13 @@ public final class CommandsData {
             + nextType() + ",profession:" + nextProfession() + ",level:5},Offers:{Recipes:[" + recipes + "]}}";
     }
 
+    private static int discountedBookPrice(int value) {
+        return Math.max(1, Math.round(value * 0.8f));
+    }
+
     private static String book(int emeralds, int books, String stars, String name, String color, String enchantments) {
+        emeralds = discountedBookPrice(emeralds);
+        books = discountedBookPrice(books);
         return "{buy:{id:emerald,count:" + emeralds + "},buyB:{id:book,count:" + books
             + "},sell:{id:enchanted_book,count:1,components:{custom_name:{text:\"" + stars + " " + name
             + "\",color:\"" + color + "\",bold:true,italic:false},stored_enchantments:{" + enchantments
@@ -121,7 +127,7 @@ public final class CommandsData {
     }
 
     public static String weaponsVillager() {
-        String stormcall = "{buy:{id:emerald,count:43},buyB:{id:book,count:23},sell:{id:enchanted_book,count:1,components:{custom_name:{text:\"★★★★★ Stormcall I\",color:\"aqua\",bold:true,italic:false},custom_data:{godvillagers_stormcall_book:true}}},maxUses:999999,rewardExp:0b,priceMultiplier:0f}";
+        String stormcall = "{buy:{id:emerald,count:" + discountedBookPrice(43) + "},buyB:{id:book,count:" + discountedBookPrice(23) + "},sell:{id:enchanted_book,count:1,components:{custom_name:{text:\"★★★★★ Stormcall I\",color:\"aqua\",bold:true,italic:false},custom_data:{godvillagers_stormcall_book:true}}},maxUses:999999,rewardExp:0b,priceMultiplier:0f}";
         String trades = String.join(",",
             book(43, 23, "★★★★★", "God Sword", "red", "sharpness:5,looting:3,fire_aspect:2,knockback:2,sweeping_edge:3,unbreaking:5,mending:3"),
             book(39, 19, "★★★★", "God Mace", "dark_purple", "density:5,wind_burst:3,unbreaking:5,mending:3"),
