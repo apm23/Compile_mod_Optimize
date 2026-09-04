@@ -25,45 +25,46 @@ final class LinkedShulkerRegressionTest {
     }
 
     @Test
-    void premiumModelGeometryIsLocked() throws IOException {
+    void lowerShellUsesZeroOverlapDecorationGeometry() throws IOException {
         String lower = compact(resource("/assets/linkedshulker/models/block/linked_shulker_lower.json"));
         assertTrue(lower.contains("\"from\":[0,2,0],\"to\":[16,8,2]"), "front wall drifted");
         assertTrue(lower.contains("\"from\":[0,2,14],\"to\":[16,8,16]"), "rear wall drifted");
         assertTrue(lower.contains("\"from\":[0,2,2],\"to\":[2,8,14]"), "left wall drifted");
         assertTrue(lower.contains("\"from\":[14,2,2],\"to\":[16,8,14]"), "right wall drifted");
-        assertTrue(lower.contains("\"from\":[1.5,2,1.5],\"to\":[14.5,2.6,14.5]"), "hollow End interior drifted");
-        assertTrue(lower.contains("\"from\":[0,0,0],\"to\":[1.1,8,1.1]"), "front-left slim gold rail drifted");
-        assertTrue(lower.contains("\"from\":[14.9,0,14.9],\"to\":[16,8,16]"), "rear-right slim gold rail drifted");
-        assertFalse(lower.contains("-0.45"), "lower front ornament must not protrude outside the block");
-        assertTrue(count(lower, "\"texture\":\"#gold\"") >= 24, "gold rails lost dimensional faces");
-        assertTrue(count(lower, "\"texture\":\"#crystal2\"") >= 24, "purple End rim lost dimensional faces");
+        assertTrue(lower.contains("\"from\":[2.05,2.02,2.05],\"to\":[13.95,2.5,13.95]"), "inner floor must stay clear of side walls");
+
+        // Decorative plates must sit outside the solid body, never coplanar/inset into it.
+        assertTrue(lower.contains("\"from\":[2,7.35,-0.04],\"to\":[14,7.85,-0.01]"), "north purple rim lost depth separation");
+        assertTrue(lower.contains("\"from\":[-0.04,7.35,2],\"to\":[-0.01,7.85,14]"), "west purple rim lost depth separation");
+        assertTrue(lower.contains("\"from\":[-0.05,0,0],\"to\":[-0.01,8,1.1]"), "gold corner plate moved back into body");
+        assertTrue(lower.contains("\"from\":[0,0,-0.05],\"to\":[1.1,8,-0.01]"), "gold corner return plate moved back into body");
+        assertFalse(lower.contains("\"from\":[0,0,0],\"to\":[1.1,8,1.1]"), "old overlapping gold cuboid returned");
+        assertFalse(lower.contains("\"from\":[2,7.35,0],\"to\":[14,7.85,0.7]"), "old overlapping purple rim returned");
     }
 
     @Test
-    void allEightLidFramesPreserveExactVerticalAnimationAndSlimDetail() throws IOException {
-        double[] bodyY = {8.0, 8.7, 9.4, 10.1, 10.8, 11.5, 12.2, 13.0};
-        double[] bodyTopY = {16.0, 16.7, 17.4, 18.1, 18.8, 19.5, 20.2, 21.0};
-        double[] crystalTopY = {16.55, 17.25, 17.95, 18.65, 19.35, 20.05, 20.75, 21.55};
+    void stableClosedAndOpenLidsAreDepthSeparated() throws IOException {
+        assertStableLid(0, 8.0, 16.0, 7.94, 7.99, 16.01, 16.12, 16.55);
+        assertStableLid(7, 13.0, 21.0, 12.94, 12.99, 21.01, 21.12, 21.55);
+    }
 
-        for (int frame = 0; frame <= 7; frame++) {
-            String lid = compact(resource("/assets/linkedshulker/models/block/linked_shulker_lid_" + frame + ".json"));
-            assertTrue(lid.contains("\"from\":[0," + number(bodyY[frame]) + ",0],\"to\":[16," + number(bodyTopY[frame]) + ",16]"), "lid body Y drifted at frame " + frame);
-            assertTrue(lid.contains("\"to\":[9.2," + number(crystalTopY[frame]) + ",9.2]"), "top crystal height drifted at frame " + frame);
-            assertTrue(lid.contains("\"from\":[0," + number(bodyY[frame] - 0.15) + ",0],\"to\":[1.1," + number(bodyTopY[frame] + 0.15) + ",1.1]"), "slim gold rail drifted at frame " + frame);
-            assertFalse(lid.contains("-0.45"), "front ornament protrudes at frame " + frame);
-            assertFalse(lid.contains("\"axis\":\"z\""), "old front crystal returned at frame " + frame);
-            assertTrue(lid.contains("\"axis\":\"y\",\"angle\":45"), "top crystal facet rotation drifted at frame " + frame);
-            assertTrue(lid.contains("\"texture\":\"#inner\""), "inner face missing at frame " + frame);
-            assertTrue(count(lid, "\"texture\":\"#gold\"") >= 30, "slim gold rails/top accent lost dimensional faces at frame " + frame);
-            assertTrue(count(lid, "\"texture\":\"#crystal2\"") >= 24, "purple End rim lost dimensional faces at frame " + frame);
-        }
+    private static void assertStableLid(int frame, double bodyY, double bodyTop, double innerBottom, double innerTop,
+                                        double topGoldBottom, double crystalBottom, double crystalTop) throws IOException {
+        String lid = compact(resource("/assets/linkedshulker/models/block/linked_shulker_lid_" + frame + ".json"));
+        assertTrue(lid.contains("\"from\":[0," + number(bodyY) + ",0],\"to\":[16," + number(bodyTop) + ",16]"), "lid body drifted at frame " + frame);
+        assertTrue(lid.contains("\"from\":[1," + number(innerBottom) + ",1],\"to\":[15," + number(innerTop) + ",15]"), "underside overlaps lid body at frame " + frame);
+        assertTrue(lid.contains("\"from\":[2," + number(bodyY + 0.2) + ",-0.04],\"to\":[14," + number(bodyY + 0.7) + ",-0.01]"), "purple rim is not outside body at frame " + frame);
+        assertTrue(lid.contains("\"from\":[-0.05," + number(bodyY - 0.15) + ",0],\"to\":[-0.01," + number(bodyTop + 0.15) + ",1.1]"), "gold plate is not outside body at frame " + frame);
+        assertTrue(lid.contains("\"from\":[6.2," + number(topGoldBottom) + ",6.2],\"to\":[9.8," + number(bodyTop + 0.1) + ",9.8]"), "top gold plate overlaps body at frame " + frame);
+        assertTrue(lid.contains("\"from\":[6.8," + number(crystalBottom) + ",6.8],\"to\":[9.2," + number(crystalTop) + ",9.2]"), "top crystal overlap/drift at frame " + frame);
+        assertFalse(lid.contains("\"from\":[0," + number(bodyY - 0.15) + ",0],\"to\":[1.1," + number(bodyTop + 0.15) + ",1.1]"), "old overlapping gold cuboid returned at frame " + frame);
     }
 
     @Test
     void premiumTexturePaletteIsCustomAndComplete() throws IOException {
         String textures = compact(resource("/assets/linkedshulker/models/block/linked_shulker_textures.json"));
         assertTrue(textures.contains("\"body\":\"linkedshulker:block/premium_body\""));
-        assertTrue(textures.contains("\"gold\":\"minecraft:block/raw_gold_block\""), "gold accents no longer use faded raw-gold palette");
+        assertTrue(textures.contains("\"gold\":\"minecraft:block/raw_gold_block\""));
         assertTrue(textures.contains("\"crystal\":\"linkedshulker:block/premium_crystal\""));
         assertTrue(textures.contains("\"crystal2\":\"linkedshulker:block/premium_crystal\""));
         assertTrue(textures.contains("\"inner\":\"linkedshulker:block/premium_inner\""));
@@ -80,9 +81,9 @@ final class LinkedShulkerRegressionTest {
         assertTrue(recipe.contains("\"C\":\"minecraft:chest\""));
 
         String item = compact(resource("/assets/linkedshulker/models/item/linked_shulker_box.json"));
-        assertTrue(item.contains("\"scale\":[0.58,0.58,0.58]"), "GUI scale drifted");
-        assertTrue(item.contains("\"scale\":[0.36,0.36,0.36]"), "first-person scale drifted");
-        assertTrue(item.contains("\"scale\":[0.34,0.34,0.34]"), "third-person scale drifted");
+        assertTrue(item.contains("\"scale\":[0.58,0.58,0.58]"));
+        assertTrue(item.contains("\"scale\":[0.36,0.36,0.36]"));
+        assertTrue(item.contains("\"scale\":[0.34,0.34,0.34]"));
     }
 
     private static String number(double value) {
@@ -92,12 +93,6 @@ final class LinkedShulkerRegressionTest {
 
     private static String compact(String text) {
         return text.replace(" ", "").replace("\n", "").replace("\r", "").replace("\t", "");
-    }
-
-    private static int count(String text, String needle) {
-        int n = 0;
-        for (int i = 0; (i = text.indexOf(needle, i)) >= 0; i += needle.length()) n++;
-        return n;
     }
 
     private static String resource(String path) throws IOException {
