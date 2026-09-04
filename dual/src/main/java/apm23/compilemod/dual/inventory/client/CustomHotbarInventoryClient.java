@@ -28,12 +28,15 @@ import java.util.List;
 public final class CustomHotbarInventoryClient implements ClientModInitializer {
     private static final KeyMapping.Category CATEGORY=KeyMapping.Category.register(CustomHotbarInventory.id("controls"));
     private static final long CYCLE_DEBOUNCE_NANOS=180_000_000L;
+    private static final long ACTION_DEBOUNCE_NANOS=120_000_000L;
     private final KeyMapping cycleInventory=KeyMappingHelper.registerKeyMapping(new KeyMapping("key.custom_hotbar_inventory.cycle_inventory",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_V,CATEGORY));
     private final KeyMapping swapHotbar=KeyMappingHelper.registerKeyMapping(new KeyMapping("key.custom_hotbar_inventory.swap_hotbar",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_B,CATEGORY));
     private final KeyMapping sortAll=KeyMappingHelper.registerKeyMapping(new KeyMapping("key.custom_hotbar_inventory.sort_all",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_N,CATEGORY));
     private final KeyMapping mergeAll=KeyMappingHelper.registerKeyMapping(new KeyMapping("key.custom_hotbar_inventory.merge_all",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_M,CATEGORY));
     private final InputDebounce hotbarDebounce=new InputDebounce(CYCLE_DEBOUNCE_NANOS);
     private final InputDebounce inventoryDebounce=new InputDebounce(CYCLE_DEBOUNCE_NANOS);
+    private final InputDebounce sortDebounce=new InputDebounce(ACTION_DEBOUNCE_NANOS);
+    private final InputDebounce mergeDebounce=new InputDebounce(ACTION_DEBOUNCE_NANOS);
     private final List<Button> pageButtons=new ArrayList<>(8);
     private final List<Button> actionButtons=new ArrayList<>(2);
     private ItemStack pendingPageCarried=ItemStack.EMPTY;
@@ -69,12 +72,14 @@ public final class CustomHotbarInventoryClient implements ClientModInitializer {
         if(matches(swapHotbar,input)){if(hotbarDebounce.tryAcquire(System.nanoTime()))sendIfPossible(new ModPayloads.SwapHotbar(),ModPayloads.SwapHotbar.TYPE);return true;}
         if(!isManagedContainer(screen))return false;
         if(matches(cycleInventory,input)){if(inventoryDebounce.tryAcquire(System.nanoTime())){rememberPageCarried();sendIfPossible(new ModPayloads.CyclePage(),ModPayloads.CyclePage.TYPE);}return true;}
+        if(screen instanceof InventoryScreen && matches(sortAll,input)){if(sortDebounce.tryAcquire(System.nanoTime()))sendSort();return true;}
+        if(screen instanceof InventoryScreen && matches(mergeAll,input)){if(mergeDebounce.tryAcquire(System.nanoTime()))sendMerge();return true;}
         return false;
     }
     private void consumeHotbarOutsideGui(){boolean clicked=false;while(swapHotbar.consumeClick())clicked=true;if(clicked&&hotbarDebounce.tryAcquire(System.nanoTime()))sendIfPossible(new ModPayloads.SwapHotbar(),ModPayloads.SwapHotbar.TYPE);}
-    private void consumeInventoryActions(){boolean sort=false,merge=false;while(sortAll.consumeClick())sort=true;while(mergeAll.consumeClick())merge=true;if(sort)sendSort();if(merge)sendMerge();}
-    private void sendSort(){sendIfPossible(new ModPayloads.SortAll(),ModPayloads.SortAll.TYPE);}
-    private void sendMerge(){sendIfPossible(new ModPayloads.MergeAll(),ModPayloads.MergeAll.TYPE);}
+    private void consumeInventoryActions(){boolean sort=false,merge=false;while(sortAll.consumeClick())sort=true;while(mergeAll.consumeClick())merge=true;long now=System.nanoTime();if(sort&&sortDebounce.tryAcquire(now))sendSort();if(merge&&mergeDebounce.tryAcquire(now))sendMerge();}
+    private void sendSort(){CustomHotbarInventory.LOGGER.info("Client sending global SORT request");sendIfPossible(new ModPayloads.SortAll(),ModPayloads.SortAll.TYPE);}
+    private void sendMerge(){CustomHotbarInventory.LOGGER.info("Client sending global MERGE request");sendIfPossible(new ModPayloads.MergeAll(),ModPayloads.MergeAll.TYPE);}
     private static boolean matches(KeyMapping m,InputConstants.Key input){return KeyMappingHelper.getBoundKeyOf(m).equals(input);} private static void drain(KeyMapping m){while(m.consumeClick()){} }
     private static boolean isManagedContainer(Screen s){return s instanceof AbstractContainerScreen<?>;}
     private void addPageButtons(Screen screen,int width,int height){final int guiLeft=(width-176)/2,guiTop=(height-166)/2;final int bw=9,bh=9,gap=1;final int x0=guiLeft+125,y0=guiTop+65;for(int page=0;page<8;page++){final int target=page;int col=page%4,row=page/4;Button b=Button.builder(Component.literal(Integer.toString(page+1)),ignored->sendPage(target)).bounds(x0+col*(bw+gap),y0+row*(bh+gap),bw,bh).build();pageButtons.add(b);Screens.getWidgets(screen).add(b);}}
