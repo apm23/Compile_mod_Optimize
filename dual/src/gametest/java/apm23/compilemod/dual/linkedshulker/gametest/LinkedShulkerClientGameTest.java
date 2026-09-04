@@ -11,7 +11,6 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -65,7 +64,8 @@ public final class LinkedShulkerClientGameTest implements FabricClientGameTest {
                 var nearby = level.getEntities(null,
                         new AABB(VILLAGER_POS.getX() - 2, VILLAGER_POS.getY() - 2, VILLAGER_POS.getZ() - 2,
                                 VILLAGER_POS.getX() + 3, VILLAGER_POS.getY() + 3, VILLAGER_POS.getZ() + 3));
-                assertTrue(nearby.stream().anyMatch(entityInstance -> entityInstance.getType() == EntityType.VILLAGER),
+                assertTrue(nearby.stream().anyMatch(entityInstance ->
+                                "minecraft:villager".equals(BuiltInRegistries.ENTITY_TYPE.getKey(entityInstance.getType()).toString())),
                         "God Tools villager did not spawn from enhanced NBT payload");
 
                 level.setBlockAndUpdate(FIRST, ModBlocks.LINKED_SHULKER.defaultBlockState());
