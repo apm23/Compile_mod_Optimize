@@ -4,6 +4,7 @@ import com.anjas.custominventory.CustomHotbarInventory;
 import com.anjas.custominventory.InputDebounce;
 import com.anjas.custominventory.ModPayloads;
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.platform.Window;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
@@ -76,8 +77,6 @@ public final class CustomHotbarInventoryClient implements ClientModInitializer {
     }
     private void consumeHotbarOutsideGui(){boolean clicked=false;while(swapHotbar.consumeClick())clicked=true;if(clicked&&hotbarDebounce.tryAcquire(System.nanoTime()))sendIfPossible(new ModPayloads.SwapHotbar(),ModPayloads.SwapHotbar.TYPE);}
     private void pollInventoryActionBindings(Minecraft client){
-        // consumeClick() is unreliable while a GUI owns keyboard focus. Poll the current physical
-        // binding directly instead, so remapped keyboard/mouse bindings work inside InventoryScreen.
         drain(sortAll);drain(mergeAll);
         boolean sortDown=isPhysicalBindingDown(client,sortAll);
         boolean mergeDown=isPhysicalBindingDown(client,mergeAll);
@@ -88,8 +87,8 @@ public final class CustomHotbarInventoryClient implements ClientModInitializer {
     }
     private static boolean isPhysicalBindingDown(Minecraft client,KeyMapping mapping){
         InputConstants.Key key=KeyMappingHelper.getBoundKeyOf(mapping);
-        long window=client.getWindow().getWindow();
-        if(key.getType()==InputConstants.Type.MOUSE)return GLFW.glfwGetMouseButton(window,key.getValue())==GLFW.GLFW_PRESS;
+        Window window=client.getWindow();
+        if(key.getType()==InputConstants.Type.MOUSE)return GLFW.glfwGetMouseButton(window.handle(),key.getValue())==GLFW.GLFW_PRESS;
         if(key.getType()==InputConstants.Type.KEYSYM)return InputConstants.isKeyDown(window,key.getValue());
         return false;
     }
