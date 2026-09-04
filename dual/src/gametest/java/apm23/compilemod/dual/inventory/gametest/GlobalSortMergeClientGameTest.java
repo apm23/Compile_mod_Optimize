@@ -1,11 +1,10 @@
 package apm23.compilemod.dual.inventory.gametest;
 
 import com.anjas.custominventory.InventoryStorage;
-import com.anjas.custominventory.ModPayloads;
+import com.anjas.custominventory.client.CustomHotbarInventoryClient;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -19,13 +18,13 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
             prepareEightPageMerge(singleplayer);
             context.waitTicks(4);
-            context.runOnClient(client -> ClientPlayNetworking.send(new ModPayloads.MergeAll()));
+            context.runOnClient(client -> CustomHotbarInventoryClient.dispatchMergeAction());
             context.waitTicks(6);
             verifyMergedAcrossAllEightPages(singleplayer);
 
             prepareEightPageSort(singleplayer);
             context.waitTicks(4);
-            context.runOnClient(client -> ClientPlayNetworking.send(new ModPayloads.SortAll()));
+            context.runOnClient(client -> CustomHotbarInventoryClient.dispatchSortAction());
             context.waitTicks(6);
             verifySortedAcrossAllEightPages(singleplayer);
         }
