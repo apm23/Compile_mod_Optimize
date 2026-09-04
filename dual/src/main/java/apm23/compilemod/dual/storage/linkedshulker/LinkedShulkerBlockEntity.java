@@ -34,6 +34,9 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
 
     public LinkedShulkerBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.LINKED_SHULKER, pos, state);
+        if (state.hasProperty(LinkedShulkerBlock.OPEN_FRAME)) {
+            animationFrame = state.getValue(LinkedShulkerBlock.OPEN_FRAME);
+        }
     }
 
     public void setChannel(String rawName) {
@@ -86,7 +89,6 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
     @Override
     public void startOpen(ContainerUser user) {
         if (viewers == 0 && level != null && !level.isClientSide()) {
-            // Short two-layer End resonance: distinct from a normal chest without becoming noisy.
             level.playSound(null, worldPosition, SoundEvents.SHULKER_SHOOT, SoundSource.BLOCKS, 0.28F, 0.72F);
             level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 0.24F, 1.62F);
         }
@@ -98,7 +100,6 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
         int previousViewers = viewers;
         viewers = Math.max(0, viewers - 1);
         if (previousViewers > 0 && viewers == 0 && level != null && !level.isClientSide()) {
-            // Compact End-themed close cue: audible but intentionally shorter/quieter than a chest slam.
             level.playSound(null, worldPosition, SoundEvents.SHULKER_CLOSE, SoundSource.BLOCKS, 0.30F, 0.86F);
             level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 0.16F, 1.20F);
         }
@@ -108,17 +109,22 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
         if (level.isClientSide()) return;
         int target = be.viewers > 0 ? LinkedShulkerBlock.MAX_OPEN_FRAME : 0;
         if (be.animationFrame == target) return;
-        be.animationFrame += be.animationFrame < target ? 1 : -1;
 
-        // One tiny End-like burst only when opening starts. No per-tick emitter: cheap on laptops/servers.
-        if (be.animationFrame == 1 && target > 0 && level instanceof ServerLevel server) {
+        // Do not cycle through block-model states every server tick. Each setBlock invalidates the
+        // chunk render section, which made the whole custom shulker visibly blink/flicker while
+        // opening and closing. Keep only stable CLOSED / OPEN blockstates so the model is rebuilt
+        // once per transition instead of seven consecutive times.
+        boolean opening = target > be.animationFrame;
+        be.animationFrame = target;
+
+        if (opening && level instanceof ServerLevel server) {
             server.sendParticles(ParticleTypes.PORTAL,
                 pos.getX() + 0.5D, pos.getY() + 0.62D, pos.getZ() + 0.5D,
                 6, 0.28D, 0.08D, 0.28D, 0.015D);
         }
 
         if (state.hasProperty(LinkedShulkerBlock.OPEN_FRAME)) {
-            level.setBlock(pos, state.setValue(LinkedShulkerBlock.OPEN_FRAME, be.animationFrame), 3);
+            level.setBlock(pos, state.setValue(LinkedShulkerBlock.OPEN_FRAME, target), 3);
         }
     }
 
