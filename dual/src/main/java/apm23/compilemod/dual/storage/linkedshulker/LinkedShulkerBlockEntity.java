@@ -95,7 +95,13 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
 
     @Override
     public void stopOpen(ContainerUser user) {
+        int previousViewers = viewers;
         viewers = Math.max(0, viewers - 1);
+        if (previousViewers > 0 && viewers == 0 && level != null && !level.isClientSide()) {
+            // Compact End-themed close cue: audible but intentionally shorter/quieter than a chest slam.
+            level.playSound(null, worldPosition, SoundEvents.SHULKER_CLOSE, SoundSource.BLOCKS, 0.30F, 0.86F);
+            level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 0.16F, 1.20F);
+        }
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, LinkedShulkerBlockEntity be) {
