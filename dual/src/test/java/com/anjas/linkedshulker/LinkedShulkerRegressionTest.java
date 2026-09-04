@@ -32,29 +32,29 @@ final class LinkedShulkerRegressionTest {
         assertTrue(lower.contains("\"from\":[0,2,2],\"to\":[2,8,14]"), "left wall drifted");
         assertTrue(lower.contains("\"from\":[14,2,2],\"to\":[16,8,14]"), "right wall drifted");
         assertTrue(lower.contains("\"from\":[1.5,2,1.5],\"to\":[14.5,2.6,14.5]"), "hollow End interior drifted");
-        assertTrue(lower.contains("\"from\":[6.2,3,-0.45],\"to\":[9.8,6.6,0.25]"), "front crystal no longer protrudes");
-        assertTrue(lower.contains("\"angle\":45"), "faceted front crystal rotation drifted");
-        assertTrue(lower.contains("\"from\":[0,0,0],\"to\":[2.2,8.25,2.2]"), "front-left gold corner pillar drifted");
-        assertTrue(lower.contains("\"from\":[13.8,0,13.8],\"to\":[16,8.25,16]"), "rear-right gold corner pillar drifted");
-        assertTrue(count(lower, "\"texture\":\"#gold\"") >= 24, "gold corner pillars lost dimensional faces");
+        assertTrue(lower.contains("\"from\":[0,0,0],\"to\":[1.1,8,1.1]"), "front-left slim gold rail drifted");
+        assertTrue(lower.contains("\"from\":[14.9,0,14.9],\"to\":[16,8,16]"), "rear-right slim gold rail drifted");
+        assertFalse(lower.contains("-0.45"), "lower front ornament must not protrude outside the block");
+        assertTrue(count(lower, "\"texture\":\"#gold\"") >= 24, "gold rails lost dimensional faces");
         assertTrue(count(lower, "\"texture\":\"#crystal2\"") >= 24, "purple End rim lost dimensional faces");
     }
 
     @Test
-    void allEightLidFramesPreserveExactVerticalAnimationAnd3dDetail() throws IOException {
+    void allEightLidFramesPreserveExactVerticalAnimationAndSlimDetail() throws IOException {
         double[] bodyY = {8.0, 8.7, 9.4, 10.1, 10.8, 11.5, 12.2, 13.0};
         double[] bodyTopY = {16.0, 16.7, 17.4, 18.1, 18.8, 19.5, 20.2, 21.0};
-        double[] crystalTopY = {16.9, 17.6, 18.3, 19.0, 19.7, 20.4, 21.1, 21.9};
+        double[] crystalTopY = {16.55, 17.25, 17.95, 18.65, 19.35, 20.05, 20.75, 21.55};
 
         for (int frame = 0; frame <= 7; frame++) {
             String lid = compact(resource("/assets/linkedshulker/models/block/linked_shulker_lid_" + frame + ".json"));
             assertTrue(lid.contains("\"from\":[0," + number(bodyY[frame]) + ",0],\"to\":[16," + number(bodyTopY[frame]) + ",16]"), "lid body Y drifted at frame " + frame);
-            assertTrue(lid.contains("\"to\":[9.7," + number(crystalTopY[frame]) + ",9.7]"), "top crystal height drifted at frame " + frame);
-            assertTrue(lid.contains("-0.45"), "front crystal stopped protruding at frame " + frame);
+            assertTrue(lid.contains("\"to\":[9.2," + number(crystalTopY[frame]) + ",9.2]"), "top crystal height drifted at frame " + frame);
+            assertTrue(lid.contains("\"from\":[0," + number(bodyY[frame] - 0.15) + ",0],\"to\":[1.1," + number(bodyTopY[frame] + 0.15) + ",1.1]"), "slim gold rail drifted at frame " + frame);
+            assertFalse(lid.contains("-0.45"), "front ornament protrudes at frame " + frame);
+            assertFalse(lid.contains("\"axis\":\"z\""), "old front crystal returned at frame " + frame);
             assertTrue(lid.contains("\"axis\":\"y\",\"angle\":45"), "top crystal facet rotation drifted at frame " + frame);
-            assertTrue(lid.contains("\"axis\":\"z\",\"angle\":45"), "front crystal facet rotation drifted at frame " + frame);
             assertTrue(lid.contains("\"texture\":\"#inner\""), "inner face missing at frame " + frame);
-            assertTrue(count(lid, "\"texture\":\"#gold\"") >= 24, "gold corner pillars lost dimensional faces at frame " + frame);
+            assertTrue(count(lid, "\"texture\":\"#gold\"") >= 30, "slim gold rails/top accent lost dimensional faces at frame " + frame);
             assertTrue(count(lid, "\"texture\":\"#crystal2\"") >= 24, "purple End rim lost dimensional faces at frame " + frame);
         }
     }
@@ -63,7 +63,7 @@ final class LinkedShulkerRegressionTest {
     void premiumTexturePaletteIsCustomAndComplete() throws IOException {
         String textures = compact(resource("/assets/linkedshulker/models/block/linked_shulker_textures.json"));
         assertTrue(textures.contains("\"body\":\"linkedshulker:block/premium_body\""));
-        assertTrue(textures.contains("\"gold\":\"minecraft:block/raw_gold_block\""), "gold corners no longer use faded raw-gold palette");
+        assertTrue(textures.contains("\"gold\":\"minecraft:block/raw_gold_block\""), "gold accents no longer use faded raw-gold palette");
         assertTrue(textures.contains("\"crystal\":\"linkedshulker:block/premium_crystal\""));
         assertTrue(textures.contains("\"crystal2\":\"linkedshulker:block/premium_crystal\""));
         assertTrue(textures.contains("\"inner\":\"linkedshulker:block/premium_inner\""));
@@ -86,7 +86,8 @@ final class LinkedShulkerRegressionTest {
     }
 
     private static String number(double value) {
-        return Double.toString(value);
+        double rounded = Math.round(value * 100.0) / 100.0;
+        return Double.toString(rounded);
     }
 
     private static String compact(String text) {
