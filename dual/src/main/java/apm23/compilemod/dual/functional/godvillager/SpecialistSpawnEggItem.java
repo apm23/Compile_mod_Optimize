@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class SpecialistSpawnEggItem extends Item {
-    private static final String GOD_FISHING_ROD_BOOK = "{buy:{id:emerald,count:" + discountedBookPrice(35) + "},buyB:{id:book,count:" + discountedBookPrice(15) + "},sell:{id:enchanted_book,count:1,components:{custom_name:{text:\"God Fishing Rod\",color:\"aqua\",bold:true,italic:false},stored_enchantments:{luck_of_the_sea:6,lure:5,unbreaking:3,mending:2}}},maxUses:999999,rewardExp:0b,priceMultiplier:0f}";
+    private static final String GOD_FISHING_ROD_BOOK = "{buy:{id:emerald,count:" + discountedBookPrice(35) + "},buyB:{id:book,count:" + discountedBookPrice(15) + "},sell:{id:enchanted_book,count:1,components:{custom_name:{text:\"God Fishing Rod\",color:\"aqua\",bold:true,italic:false},stored_enchantments:{luck_of_the_sea:25,lure:5,unbreaking:3,mending:2}}},maxUses:999999,rewardExp:0b,priceMultiplier:0f}";
     private static final String GOD_SHIELD_BOOK = "{buy:{id:emerald,count:" + discountedBookPrice(35) + "},buyB:{id:book,count:" + discountedBookPrice(15) + "},sell:{id:enchanted_book,count:1,components:{custom_name:{text:\"God Shield\",color:\"dark_red\",bold:true,italic:false},stored_enchantments:{unbreaking:4,mending:3,thorns:5}}},maxUses:999999,rewardExp:0b,priceMultiplier:0f}";
     private static final String MAGNET_I_BOOK = bookTrade("Magnet I", "godvillagers:magnet", 1, 32);
     private static final String LIFE_STEAL_I_BOOK = bookTrade("Life Steal I", "godvillagers:life_steal", 1, 32);
