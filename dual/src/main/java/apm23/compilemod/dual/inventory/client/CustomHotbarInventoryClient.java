@@ -4,7 +4,6 @@ import com.anjas.custominventory.CustomHotbarInventory;
 import com.anjas.custominventory.InputDebounce;
 import com.anjas.custominventory.ModPayloads;
 import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.platform.Window;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
@@ -36,11 +35,8 @@ public final class CustomHotbarInventoryClient implements ClientModInitializer {
     private final InputDebounce hotbarDebounce=new InputDebounce(CYCLE_DEBOUNCE_NANOS);
     private final InputDebounce inventoryDebounce=new InputDebounce(CYCLE_DEBOUNCE_NANOS);
     private final List<Button> pageButtons=new ArrayList<>(8);
-    private final List<Button> actionButtons=new ArrayList<>(2);
     private ItemStack pendingPageCarried=ItemStack.EMPTY;
     private int visiblePage=0;
-    private boolean sortWasDown=false;
-    private boolean mergeWasDown=false;
 
     @Override public void onInitializeClient(){
         CustomHotbarInventory.LOGGER.info("Custom Hotbar Inventory client initialized");
@@ -56,48 +52,43 @@ public final class CustomHotbarInventoryClient implements ClientModInitializer {
         ScreenEvents.AFTER_INIT.register((client,screen,width,height)->{
             installGuiInput(screen);
             if(!isManagedContainer(screen))return;
-            pageButtons.clear(); actionButtons.clear();
+            pageButtons.clear();
             if(ClientPlayNetworking.canSend(ModPayloads.BrowseOpen.TYPE))ClientPlayNetworking.send(new ModPayloads.BrowseOpen());
-            if(screen instanceof InventoryScreen){addPageButtons(screen,width,height);addActionButtons(screen,width,height);refreshPageButtons();}
-            ScreenEvents.remove(screen).register(removed->{pageButtons.clear();actionButtons.clear();pendingPageCarried=ItemStack.EMPTY;sortWasDown=false;mergeWasDown=false;if(ClientPlayNetworking.canSend(ModPayloads.BrowseClose.TYPE))ClientPlayNetworking.send(new ModPayloads.BrowseClose());});
+            if(screen instanceof InventoryScreen){addPageButtons(screen,width,height);refreshPageButtons();}
+            ScreenEvents.remove(screen).register(removed->{pageButtons.clear();pendingPageCarried=ItemStack.EMPTY;if(ClientPlayNetworking.canSend(ModPayloads.BrowseClose.TYPE))ClientPlayNetworking.send(new ModPayloads.BrowseClose());});
         });
         ClientTickEvents.END_CLIENT_TICK.register(client->{
-            Screen screen=client.gui.screen();
-            if(screen==null){consumeHotbarOutsideGui();drain(cycleInventory);drain(sortAll);drain(mergeAll);sortWasDown=false;mergeWasDown=false;return;}
-            drain(swapHotbar);drain(cycleInventory);
-            if(screen instanceof InventoryScreen){pollInventoryActionBindings(client);} else {drain(sortAll);drain(mergeAll);sortWasDown=false;mergeWasDown=false;}
+            if(client.gui.screen()==null){consumeHotbarOutsideGui();drain(cycleInventory);drain(sortAll);drain(mergeAll);return;}
+            drain(swapHotbar);drain(cycleInventory);drain(sortAll);drain(mergeAll);
         });
     }
-    private void installGuiInput(Screen screen){ScreenKeyboardEvents.allowKeyPress(screen).register((s,event)->!handleGuiInput(s,InputConstants.getKey(event)));ScreenMouseEvents.allowMouseClick(screen).register((s,event)->!handleGuiInput(s,InputConstants.Type.MOUSE.getOrCreate(event.button())));}
+    private void installGuiInput(Screen screen){
+        ScreenKeyboardEvents.allowKeyPress(screen).register((s,event)->!handleGuiInput(s,InputConstants.getKey(event)));
+        ScreenMouseEvents.allowMouseClick(screen).register((s,event)->!handleGuiInput(s,InputConstants.Type.MOUSE.getOrCreate(event.button())));
+    }
     private boolean handleGuiInput(Screen screen,InputConstants.Key input){
         if(matches(swapHotbar,input)){if(hotbarDebounce.tryAcquire(System.nanoTime()))sendIfPossible(new ModPayloads.SwapHotbar(),ModPayloads.SwapHotbar.TYPE);return true;}
         if(!isManagedContainer(screen))return false;
         if(matches(cycleInventory,input)){if(inventoryDebounce.tryAcquire(System.nanoTime())){rememberPageCarried();sendIfPossible(new ModPayloads.CyclePage(),ModPayloads.CyclePage.TYPE);}return true;}
+        if(screen instanceof InventoryScreen && matches(sortAll,input)){
+            CustomHotbarInventory.LOGGER.info("Client sending global SORT request from proven GUI key path");
+            sendIfPossible(new ModPayloads.SortAll(),ModPayloads.SortAll.TYPE);
+            return true;
+        }
+        if(screen instanceof InventoryScreen && matches(mergeAll,input)){
+            CustomHotbarInventory.LOGGER.info("Client sending global MERGE request from proven GUI key path");
+            sendIfPossible(new ModPayloads.MergeAll(),ModPayloads.MergeAll.TYPE);
+            return true;
+        }
         return false;
     }
+    public boolean testHandleGuiInput(Screen screen, InputConstants.Key input){return handleGuiInput(screen,input);}
+    public InputConstants.Key testSortKey(){return KeyMappingHelper.getBoundKeyOf(sortAll);}
+    public InputConstants.Key testMergeKey(){return KeyMappingHelper.getBoundKeyOf(mergeAll);}
     private void consumeHotbarOutsideGui(){boolean clicked=false;while(swapHotbar.consumeClick())clicked=true;if(clicked&&hotbarDebounce.tryAcquire(System.nanoTime()))sendIfPossible(new ModPayloads.SwapHotbar(),ModPayloads.SwapHotbar.TYPE);}
-    private void pollInventoryActionBindings(Minecraft client){
-        drain(sortAll);drain(mergeAll);
-        boolean sortDown=isPhysicalBindingDown(client,sortAll);
-        boolean mergeDown=isPhysicalBindingDown(client,mergeAll);
-        if(sortDown&&!sortWasDown)dispatchSortAction();
-        if(mergeDown&&!mergeWasDown)dispatchMergeAction();
-        sortWasDown=sortDown;
-        mergeWasDown=mergeDown;
-    }
-    private static boolean isPhysicalBindingDown(Minecraft client,KeyMapping mapping){
-        InputConstants.Key key=KeyMappingHelper.getBoundKeyOf(mapping);
-        Window window=client.getWindow();
-        if(key.getType()==InputConstants.Type.MOUSE)return GLFW.glfwGetMouseButton(window.handle(),key.getValue())==GLFW.GLFW_PRESS;
-        if(key.getType()==InputConstants.Type.KEYSYM)return InputConstants.isKeyDown(window,key.getValue());
-        return false;
-    }
-    public static void dispatchSortAction(){CustomHotbarInventory.LOGGER.info("Client sending global SORT request");sendIfPossible(new ModPayloads.SortAll(),ModPayloads.SortAll.TYPE);}
-    public static void dispatchMergeAction(){CustomHotbarInventory.LOGGER.info("Client sending global MERGE request");sendIfPossible(new ModPayloads.MergeAll(),ModPayloads.MergeAll.TYPE);}
     private static boolean matches(KeyMapping m,InputConstants.Key input){return KeyMappingHelper.getBoundKeyOf(m).equals(input);} private static void drain(KeyMapping m){while(m.consumeClick()){} }
     private static boolean isManagedContainer(Screen s){return s instanceof AbstractContainerScreen<?>;}
     private void addPageButtons(Screen screen,int width,int height){final int guiLeft=(width-176)/2,guiTop=(height-166)/2;final int bw=9,bh=9,gap=1;final int x0=guiLeft+125,y0=guiTop+65;for(int page=0;page<8;page++){final int target=page;int col=page%4,row=page/4;Button b=Button.builder(Component.literal(Integer.toString(page+1)),ignored->sendPage(target)).bounds(x0+col*(bw+gap),y0+row*(bh+gap),bw,bh).build();pageButtons.add(b);Screens.getWidgets(screen).add(b);}}
-    private void addActionButtons(Screen screen,int width,int height){final int guiLeft=(width-176)/2,guiTop=(height-166)/2;Button sort=Button.builder(Component.literal("Sort"),ignored->dispatchSortAction()).bounds(guiLeft+125,guiTop+86,39,10).build();Button merge=Button.builder(Component.literal("Merge"),ignored->dispatchMergeAction()).bounds(guiLeft+125,guiTop+97,39,10).build();actionButtons.add(sort);actionButtons.add(merge);Screens.getWidgets(screen).add(sort);Screens.getWidgets(screen).add(merge);}
     private void refreshPageButtons(){for(int i=0;i<pageButtons.size();i++){Button b=pageButtons.get(i);b.active=i!=visiblePage;b.setMessage(Component.literal(Integer.toString(i+1)));}}
     private void sendPage(int page){rememberPageCarried();sendIfPossible(payloadForPage(page),typeForPage(page));}
     private void rememberPageCarried(){Minecraft client=Minecraft.getInstance();pendingPageCarried=client.player==null?ItemStack.EMPTY:client.player.containerMenu.getCarried().copy();}
