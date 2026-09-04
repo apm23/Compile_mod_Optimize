@@ -1,4 +1,5 @@
 {
   "block.forceanvil.force_anvil": "Force Anvil",
-  "block.forceanvil.velocity_hopper": "Velocity Hopper"
+  "block.forceanvil.velocity_hopper": "Velocity Hopper",
+  "container.forceanvil.force_anvil": "Force Anvil"
 }
