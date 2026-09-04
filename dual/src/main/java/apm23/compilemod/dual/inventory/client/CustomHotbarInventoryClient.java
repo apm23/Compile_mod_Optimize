@@ -21,6 +21,7 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,6 +35,7 @@ public final class CustomHotbarInventoryClient implements ClientModInitializer {
     private final InputDebounce hotbarDebounce=new InputDebounce(CYCLE_DEBOUNCE_NANOS);
     private final InputDebounce inventoryDebounce=new InputDebounce(CYCLE_DEBOUNCE_NANOS);
     private final List<Button> pageButtons=new ArrayList<>(8);
+    private final List<Button> actionButtons=new ArrayList<>(2);
     private ItemStack pendingPageCarried=ItemStack.EMPTY;
     private int visiblePage=0;
 
@@ -51,34 +53,36 @@ public final class CustomHotbarInventoryClient implements ClientModInitializer {
         ScreenEvents.AFTER_INIT.register((client,screen,width,height)->{
             installGuiInput(screen);
             if(!isManagedContainer(screen))return;
-            pageButtons.clear();
+            pageButtons.clear(); actionButtons.clear();
             if(ClientPlayNetworking.canSend(ModPayloads.BrowseOpen.TYPE))ClientPlayNetworking.send(new ModPayloads.BrowseOpen());
-            if(screen instanceof InventoryScreen){addPageButtons(screen,width,height);refreshPageButtons();}
-            ScreenEvents.remove(screen).register(removed->{pageButtons.clear();pendingPageCarried=ItemStack.EMPTY;if(ClientPlayNetworking.canSend(ModPayloads.BrowseClose.TYPE))ClientPlayNetworking.send(new ModPayloads.BrowseClose());});
+            if(screen instanceof InventoryScreen){addPageButtons(screen,width,height);addActionButtons(screen,width,height);refreshPageButtons();}
+            ScreenEvents.remove(screen).register(removed->{pageButtons.clear();actionButtons.clear();pendingPageCarried=ItemStack.EMPTY;if(ClientPlayNetworking.canSend(ModPayloads.BrowseClose.TYPE))ClientPlayNetworking.send(new ModPayloads.BrowseClose());});
         });
-        ClientTickEvents.END_CLIENT_TICK.register(client->{if(client.gui.screen()==null){consumeHotbarOutsideGui();drain(cycleInventory);drain(sortAll);drain(mergeAll);}else{drain(swapHotbar);drain(cycleInventory);drain(sortAll);drain(mergeAll);}});
+        ClientTickEvents.END_CLIENT_TICK.register(client->{
+            if(client.gui.screen()==null){consumeHotbarOutsideGui();drain(cycleInventory);drain(sortAll);drain(mergeAll);return;}
+            drain(swapHotbar);drain(cycleInventory);
+            if(client.gui.screen() instanceof InventoryScreen)consumeInventoryActions(); else {drain(sortAll);drain(mergeAll);}
+        });
     }
     private void installGuiInput(Screen screen){ScreenKeyboardEvents.allowKeyPress(screen).register((s,event)->!handleGuiInput(s,InputConstants.getKey(event)));ScreenMouseEvents.allowMouseClick(screen).register((s,event)->!handleGuiInput(s,InputConstants.Type.MOUSE.getOrCreate(event.button())));}
     private boolean handleGuiInput(Screen screen,InputConstants.Key input){
         if(matches(swapHotbar,input)){if(hotbarDebounce.tryAcquire(System.nanoTime()))sendIfPossible(new ModPayloads.SwapHotbar(),ModPayloads.SwapHotbar.TYPE);return true;}
         if(!isManagedContainer(screen))return false;
         if(matches(cycleInventory,input)){if(inventoryDebounce.tryAcquire(System.nanoTime())){rememberPageCarried();sendIfPossible(new ModPayloads.CyclePage(),ModPayloads.CyclePage.TYPE);}return true;}
-        if(screen instanceof InventoryScreen && matches(sortAll,input)){sendIfPossible(new ModPayloads.SortAll(),ModPayloads.SortAll.TYPE);return true;}
-        if(screen instanceof InventoryScreen && matches(mergeAll,input)){sendIfPossible(new ModPayloads.MergeAll(),ModPayloads.MergeAll.TYPE);return true;}
         return false;
     }
     private void consumeHotbarOutsideGui(){boolean clicked=false;while(swapHotbar.consumeClick())clicked=true;if(clicked&&hotbarDebounce.tryAcquire(System.nanoTime()))sendIfPossible(new ModPayloads.SwapHotbar(),ModPayloads.SwapHotbar.TYPE);}
+    private void consumeInventoryActions(){boolean sort=false,merge=false;while(sortAll.consumeClick())sort=true;while(mergeAll.consumeClick())merge=true;if(sort)sendSort();if(merge)sendMerge();}
+    private void sendSort(){sendIfPossible(new ModPayloads.SortAll(),ModPayloads.SortAll.TYPE);}
+    private void sendMerge(){sendIfPossible(new ModPayloads.MergeAll(),ModPayloads.MergeAll.TYPE);}
     private static boolean matches(KeyMapping m,InputConstants.Key input){return KeyMappingHelper.getBoundKeyOf(m).equals(input);} private static void drain(KeyMapping m){while(m.consumeClick()){} }
     private static boolean isManagedContainer(Screen s){return s instanceof AbstractContainerScreen<?>;}
     private void addPageButtons(Screen screen,int width,int height){final int guiLeft=(width-176)/2,guiTop=(height-166)/2;final int bw=9,bh=9,gap=1;final int x0=guiLeft+125,y0=guiTop+65;for(int page=0;page<8;page++){final int target=page;int col=page%4,row=page/4;Button b=Button.builder(Component.literal(Integer.toString(page+1)),ignored->sendPage(target)).bounds(x0+col*(bw+gap),y0+row*(bh+gap),bw,bh).build();pageButtons.add(b);Screens.getWidgets(screen).add(b);}}
+    private void addActionButtons(Screen screen,int width,int height){final int guiLeft=(width-176)/2,guiTop=(height-166)/2;Button sort=Button.builder(Component.literal("Sort"),ignored->sendSort()).bounds(guiLeft+125,guiTop+86,39,10).build();Button merge=Button.builder(Component.literal("Merge"),ignored->sendMerge()).bounds(guiLeft+125,guiTop+97,39,10).build();actionButtons.add(sort);actionButtons.add(merge);Screens.getWidgets(screen).add(sort);Screens.getWidgets(screen).add(merge);}
     private void refreshPageButtons(){for(int i=0;i<pageButtons.size();i++){Button b=pageButtons.get(i);b.active=i!=visiblePage;b.setMessage(Component.literal(Integer.toString(i+1)));}}
     private void sendPage(int page){rememberPageCarried();sendIfPossible(payloadForPage(page),typeForPage(page));}
     private void rememberPageCarried(){Minecraft client=Minecraft.getInstance();pendingPageCarried=client.player==null?ItemStack.EMPTY:client.player.containerMenu.getCarried().copy();}
-    private void restorePendingPageCarried(Minecraft client){
-        if(pendingPageCarried.isEmpty()||client.player==null){pendingPageCarried=ItemStack.EMPTY;return;}
-        client.player.containerMenu.setCarried(pendingPageCarried.copy());
-        pendingPageCarried=ItemStack.EMPTY;
-    }
+    private void restorePendingPageCarried(Minecraft client){if(pendingPageCarried.isEmpty()||client.player==null){pendingPageCarried=ItemStack.EMPTY;return;}client.player.containerMenu.setCarried(pendingPageCarried.copy());pendingPageCarried=ItemStack.EMPTY;}
     private static void sendIfPossible(net.minecraft.network.protocol.common.custom.CustomPacketPayload p,net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<?> t){if(ClientPlayNetworking.canSend(t))ClientPlayNetworking.send(p);}
     private static net.minecraft.network.protocol.common.custom.CustomPacketPayload payloadForPage(int p){return switch(p){case 0->new ModPayloads.DirectPage.P1();case 1->new ModPayloads.DirectPage.P2();case 2->new ModPayloads.DirectPage.P3();case 3->new ModPayloads.DirectPage.P4();case 4->new ModPayloads.DirectPage.P5();case 5->new ModPayloads.DirectPage.P6();case 6->new ModPayloads.DirectPage.P7();case 7->new ModPayloads.DirectPage.P8();default->throw new IllegalArgumentException("page="+p);};}
     private static net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<?> typeForPage(int p){return switch(p){case 0->ModPayloads.DirectPage.P1.TYPE;case 1->ModPayloads.DirectPage.P2.TYPE;case 2->ModPayloads.DirectPage.P3.TYPE;case 3->ModPayloads.DirectPage.P4.TYPE;case 4->ModPayloads.DirectPage.P5.TYPE;case 5->ModPayloads.DirectPage.P6.TYPE;case 6->ModPayloads.DirectPage.P7.TYPE;case 7->ModPayloads.DirectPage.P8.TYPE;default->throw new IllegalArgumentException("page="+p);};}
