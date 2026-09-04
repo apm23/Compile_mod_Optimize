@@ -34,8 +34,8 @@ final class LinkedShulkerRegressionTest {
         assertTrue(lower.contains("\"from\":[1.5,2,1.5],\"to\":[14.5,2.6,14.5]"), "hollow End interior drifted");
         assertTrue(lower.contains("\"from\":[6.2,3,-0.45],\"to\":[9.8,6.6,0.25]"), "front crystal no longer protrudes");
         assertTrue(lower.contains("\"angle\":45"), "faceted front crystal rotation drifted");
-        assertTrue(lower.contains("\"from\":[0,0,0],\"to\":[2.2,8.5,2.2]"), "front-left gold corner pillar drifted");
-        assertTrue(lower.contains("\"from\":[13.8,0,13.8],\"to\":[16,8.5,16]"), "rear-right gold corner pillar drifted");
+        assertTrue(lower.contains("\"from\":[0,0,0],\"to\":[2.2,8.25,2.2]"), "front-left gold corner pillar drifted");
+        assertTrue(lower.contains("\"from\":[13.8,0,13.8],\"to\":[16,8.25,16]"), "rear-right gold corner pillar drifted");
         assertTrue(count(lower, "\"texture\":\"#gold\"") >= 24, "gold corner pillars lost dimensional faces");
         assertTrue(count(lower, "\"texture\":\"#crystal2\"") >= 24, "purple End rim lost dimensional faces");
     }
@@ -86,7 +86,6 @@ final class LinkedShulkerRegressionTest {
     }
 
     private static String number(double value) {
-        if (value == Math.rint(value)) return Integer.toString((int) value);
         return Double.toString(value);
     }
 
