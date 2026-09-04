@@ -5,6 +5,7 @@ import com.anjas.custominventory.client.CustomHotbarInventoryClient;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -18,13 +19,25 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
             prepareEightPageMerge(singleplayer);
             context.waitTicks(4);
-            context.runOnClient(client -> CustomHotbarInventoryClient.dispatchMergeAction());
+            context.runOnClient(client -> {
+                if (client.player == null) throw new AssertionError("client player missing");
+                CustomHotbarInventoryClient input = new CustomHotbarInventoryClient();
+                InventoryScreen screen = new InventoryScreen(client.player);
+                boolean handled = input.testHandleGuiInput(screen, input.testMergeKey());
+                if (!handled) throw new AssertionError("merge key was not handled by GUI input path");
+            });
             context.waitTicks(6);
             verifyMergedAcrossAllEightPages(singleplayer);
 
             prepareEightPageSort(singleplayer);
             context.waitTicks(4);
-            context.runOnClient(client -> CustomHotbarInventoryClient.dispatchSortAction());
+            context.runOnClient(client -> {
+                if (client.player == null) throw new AssertionError("client player missing");
+                CustomHotbarInventoryClient input = new CustomHotbarInventoryClient();
+                InventoryScreen screen = new InventoryScreen(client.player);
+                boolean handled = input.testHandleGuiInput(screen, input.testSortKey());
+                if (!handled) throw new AssertionError("sort key was not handled by GUI input path");
+            });
             context.waitTicks(6);
             verifySortedAcrossAllEightPages(singleplayer);
         }
@@ -73,6 +86,7 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
         singleplayer.getServer().runOnServer(server -> {
             var player = server.getPlayerList().getPlayers().getFirst();
             player.containerMenu = player.inventoryMenu;
+            InventoryStorage.setBrowsing(player, true);
             InventoryStorage.switchPage(player, 0);
             var items = List.of(
                     Items.ROTTEN_FLESH,
