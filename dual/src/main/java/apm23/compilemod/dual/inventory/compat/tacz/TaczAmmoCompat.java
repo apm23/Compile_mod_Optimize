@@ -46,8 +46,7 @@ public final class TaczAmmoCompat {
                     if (!(args[0] instanceof Player player)) return false;
                     ItemStack gun = (ItemStack) args[1];
                     if (player instanceof ServerPlayer sp) {
-                        ServerAmmoView view = new ServerAmmoView(sp);
-                        return hasCompatible(view.snapshot(), gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount);
+                        return hasCompatible(new ServerAmmoView(sp), gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount);
                     }
                     return hasCompatible(clientSnapshot(player), gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount);
                 }
@@ -104,14 +103,25 @@ public final class TaczAmmoCompat {
         }
     }
 
-    private static boolean hasCompatible(List<ItemStack> stacks, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass, Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
-        for (ItemStack stack : stacks) {
-            if (stack == null || stack.isEmpty()) continue;
-            Object item = stack.getItem();
-            if (ammoClass.isInstance(item) && Boolean.TRUE.equals(ammoMatches.invoke(item, gun, stack))) return true;
-            if (ammoBoxClass.isInstance(item) && Boolean.TRUE.equals(boxMatches.invoke(item, gun, stack)) && ((Number) boxCount.invoke(item, stack)).intValue() > 0) return true;
+    private static boolean hasCompatible(ServerAmmoView view, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass, Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
+        for (int slot = 0; slot < view.size(); slot++) {
+            ItemStack stack = view.get(slot);
+            if (isCompatible(stack, gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount)) return true;
         }
         return false;
+    }
+
+    private static boolean hasCompatible(List<ItemStack> stacks, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass, Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
+        for (ItemStack stack : stacks) if (isCompatible(stack, gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount)) return true;
+        return false;
+    }
+
+    private static boolean isCompatible(ItemStack stack, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass, Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
+        if (stack == null || stack.isEmpty()) return false;
+        Object item = stack.getItem();
+        if (ammoClass.isInstance(item) && Boolean.TRUE.equals(ammoMatches.invoke(item, gun, stack))) return true;
+        return ammoBoxClass.isInstance(item) && Boolean.TRUE.equals(boxMatches.invoke(item, gun, stack))
+                && ((Number) boxCount.invoke(item, stack)).intValue() > 0;
     }
 
     private static List<ItemStack> clientSnapshot(Player player) {
@@ -119,7 +129,7 @@ public final class TaczAmmoCompat {
         for (int i = 0; i < 36; i++) all.add(player.getInventory().getItem(i));
         try {
             Class<?> cache = Class.forName("com.anjas.custominventory.client.HiddenRecipeContentsClient");
-            @SuppressWarnings("unchecked") List<ItemStack> hidden = (List<ItemStack>) cache.getMethod("snapshot").invoke(null);
+            @SuppressWarnings("unchecked") List<ItemStack> hidden = (List<ItemStack>) cache.getMethod("view").invoke(null);
             all.addAll(hidden);
         } catch (ReflectiveOperationException | LinkageError ignored) {}
         return all;
@@ -143,7 +153,6 @@ public final class TaczAmmoCompat {
             if (page == activePage) return player.getInventory().getItem(InventoryStorage.MAIN_START + index);
             return pages.get(page).get(index);
         }
-        private List<ItemStack> snapshot() { ArrayList<ItemStack> out = new ArrayList<>(size()); for (int i = 0; i < size(); i++) out.add(get(i)); return out; }
         private void commit() {
             InventoryStorage.snapshotLive(player);
             for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) if (page != activePage) InventoryStorage.write(player, page, pages.get(page));
