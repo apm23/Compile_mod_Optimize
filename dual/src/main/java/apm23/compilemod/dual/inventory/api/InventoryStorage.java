@@ -50,10 +50,7 @@ public final class InventoryStorage {
         return AttachmentRegistry.createPersistent(id(namespace, path), ItemStack.OPTIONAL_CODEC.listOf());
     }
 
-    private static Identifier id(String namespace, String path) {
-        return Identifier.fromNamespaceAndPath(namespace, path);
-    }
-
+    private static Identifier id(String namespace, String path) { return Identifier.fromNamespaceAndPath(namespace, path); }
     private static AttachmentTarget target(ServerPlayer player) { return (AttachmentTarget) player; }
 
     public static void migrateLegacy(ServerPlayer player) {
@@ -107,6 +104,16 @@ public final class InventoryStorage {
         }
     }
 
+    /** Read-only zero-copy access for hot compatibility queries; the returned stack must never be mutated. */
+    public static ItemStack peekStoredStack(ServerPlayer player, int page, int slot) {
+        validatePage(page);
+        if (slot < 0 || slot >= PAGE_SIZE) throw new IllegalArgumentException("slot=" + slot);
+        List<ItemStack> stored = target(player).getAttachedOrElse(PAGES[page], List.of());
+        if (slot >= stored.size()) return ItemStack.EMPTY;
+        ItemStack stack = stored.get(slot);
+        return stack == null ? ItemStack.EMPTY : stack;
+    }
+
     public static void write(ServerPlayer player, int page, List<ItemStack> stacks) {
         validatePage(page);
         target(player).setAttached(PAGES[page], List.copyOf(normalizedCopy(stacks, PAGE_SIZE)));
@@ -138,10 +145,8 @@ public final class InventoryStorage {
     }
 
     public static void cycle(ServerPlayer player) { switchPage(player, (active(player) + 1) % PAGE_COUNT); }
-
     public static void routeOverflow(ServerPlayer player) { routeOverflowAndReport(player); }
 
-    /** Same routing semantics as routeOverflow, but reports whether a page switch happened. */
     public static boolean routeOverflowAndReport(ServerPlayer player) {
         if (isBrowsing(player) || player.containerMenu != player.inventoryMenu) return false;
         if (hasEmptyLiveSlot(player)) return false;
