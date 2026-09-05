@@ -54,9 +54,7 @@ public final class CustomHotbarInventory implements ModInitializer {
         ArrayList<ItemStack> hidden=new ArrayList<>();
         for(int page=0;page<InventoryStorage.PAGE_COUNT;page++){
             if(page==active)continue;
-            // InventoryStorage.read already returns defensive copies. Empty slots have no semantic
-            // value for recipe-book/TACZ reserve-ammo consumers, so omit them from the wire payload.
-            for(ItemStack stack:InventoryStorage.read(p,page))if(!stack.isEmpty())hidden.add(stack);
+            InventoryStorage.forEachStoredStack(p,page,stack->{if(!stack.isEmpty())hidden.add(stack.copy());});
         }
         ServerPlayNetworking.send(p,new ModPayloads.HiddenRecipeContents(hidden));
     }
