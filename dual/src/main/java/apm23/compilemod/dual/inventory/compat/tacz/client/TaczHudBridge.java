@@ -11,14 +11,22 @@ public final class TaczHudBridge {
     private static volatile Access access;
     private static volatile boolean attempted;
 
+    private static ItemStack cachedGunRef = ItemStack.EMPTY;
+    private static long cachedRevision = Long.MIN_VALUE;
+    private static int cachedHiddenAmmo;
+
     private TaczHudBridge() {}
 
     public static int countHiddenAmmo(ItemStack gun) {
         Access a = access();
         if (a == null || gun == null || gun.isEmpty()) return 0;
+
+        long revision = HiddenRecipeContentsClient.revision();
+        if (gun == cachedGunRef && revision == cachedRevision) return cachedHiddenAmmo;
+
         int total = 0;
         try {
-            for (ItemStack stack : HiddenRecipeContentsClient.snapshot()) {
+            for (ItemStack stack : HiddenRecipeContentsClient.view()) {
                 if (stack == null || stack.isEmpty()) continue;
                 Object item = stack.getItem();
                 if (a.ammoClass.isInstance(item)
@@ -28,16 +36,23 @@ public final class TaczHudBridge {
                         && Boolean.TRUE.equals(a.boxMatches.invoke(item, gun, stack))) {
                     if (Boolean.TRUE.equals(a.boxCreative.invoke(item, stack))
                             || Boolean.TRUE.equals(a.boxAllCreative.invoke(item, stack))) {
-                        return HUD_MAX;
+                        return cache(gun, revision, HUD_MAX);
                     }
                     total += Math.max(0, ((Number) a.boxCount.invoke(item, stack)).intValue());
                 }
-                if (total >= HUD_MAX) return HUD_MAX;
+                if (total >= HUD_MAX) return cache(gun, revision, HUD_MAX);
             }
         } catch (ReflectiveOperationException | LinkageError ignored) {
-            return 0;
+            return cache(gun, revision, 0);
         }
-        return Math.min(total, HUD_MAX);
+        return cache(gun, revision, Math.min(total, HUD_MAX));
+    }
+
+    private static int cache(ItemStack gun, long revision, int value) {
+        cachedGunRef = gun;
+        cachedRevision = revision;
+        cachedHiddenAmmo = value;
+        return value;
     }
 
     private static Access access() {
