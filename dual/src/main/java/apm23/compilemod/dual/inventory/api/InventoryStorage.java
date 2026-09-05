@@ -60,7 +60,6 @@ public final class InventoryStorage {
         AttachmentTarget target = target(player);
         int active = active(player);
         boolean migrated = false;
-
         for (int page = 0; page < PAGE_COUNT; page++) {
             List<ItemStack> legacy = normalizedCopy(target.getAttachedOrElse(LEGACY_PAGES[page], List.of()), PAGE_SIZE);
             if (!hasAnyItem(legacy) || hasAnyItem(read(player, page))) continue;
@@ -69,7 +68,6 @@ public final class InventoryStorage {
             if (page == active) loadLive(player, legacy);
             migrated = true;
         }
-
         if (!hasAnyItem(readAltHotbar(player))) {
             List<ItemStack> legacyAlt = normalizedCopy(target.getAttachedOrElse(LEGACY_ALT_HOTBAR, List.of()), 9);
             if (!hasAnyItem(legacyAlt)) legacyAlt = normalizedCopy(target.getAttachedOrElse(LEGACY_HOTBAR_PAGE_2, List.of()), 9);
@@ -78,7 +76,6 @@ public final class InventoryStorage {
                 migrated = true;
             }
         }
-
         target.getAttachedOrElse(LEGACY_ACTIVE_PAGE, 0);
         if (migrated) {
             sync(player);
@@ -142,16 +139,20 @@ public final class InventoryStorage {
 
     public static void cycle(ServerPlayer player) { switchPage(player, (active(player) + 1) % PAGE_COUNT); }
 
-    public static void routeOverflow(ServerPlayer player) {
-        if (isBrowsing(player) || player.containerMenu != player.inventoryMenu) return;
-        if (hasEmptyLiveSlot(player)) return;
+    public static void routeOverflow(ServerPlayer player) { routeOverflowAndReport(player); }
+
+    /** Same routing semantics as routeOverflow, but reports whether a page switch happened. */
+    public static boolean routeOverflowAndReport(ServerPlayer player) {
+        if (isBrowsing(player) || player.containerMenu != player.inventoryMenu) return false;
+        if (hasEmptyLiveSlot(player)) return false;
         int current = active(player);
         for (int page = 0; page < PAGE_COUNT; page++) {
             if (page != current && hasEmptyStoredSlot(player, page)) {
                 switchPage(player, page);
-                return;
+                return true;
             }
         }
+        return false;
     }
 
     private static boolean hasEmptyLiveSlot(ServerPlayer player) {
