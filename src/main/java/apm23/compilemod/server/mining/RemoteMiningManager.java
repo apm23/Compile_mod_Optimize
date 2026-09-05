@@ -1,6 +1,7 @@
 package com.apm23.custompickaxe;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -10,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -70,8 +72,34 @@ public final class RemoteMiningManager {
         if (previous != null) previous.preserveCollected();
     }
 
-    public static void tick(ServerLevel level) {
-        TASKS.values().removeIf(task -> task.tick(level));
+    public static void tick(MinecraftServer server) {
+        if (TASKS.isEmpty()) return;
+
+        int remainingPositions = POSITIONS_PER_TICK;
+        int remainingBlocks = BLOCKS_PER_TICK;
+        Iterator<ScanTask> iterator = TASKS.values().iterator();
+
+        while (iterator.hasNext()) {
+            ScanTask task = iterator.next();
+            if (task.player.isRemoved() || task.player.hasDisconnected()) {
+                task.preserveCollected();
+                iterator.remove();
+                continue;
+            }
+
+            ServerLevel level = server.getLevel(task.dimension);
+            if (level == null || task.player.level() != level) {
+                task.preserveCollected();
+                iterator.remove();
+                continue;
+            }
+
+            if (remainingPositions <= 0 || remainingBlocks <= 0) break;
+            ScanProgress progress = task.tick(level, remainingPositions, remainingBlocks);
+            remainingPositions -= progress.scanned();
+            remainingBlocks -= progress.broken();
+            if (progress.finished()) iterator.remove();
+        }
     }
 
     private static void breakNaturalMask(ServerLevel level, ServerPlayer player, BlockPos origin) {
@@ -129,26 +157,10 @@ public final class RemoteMiningManager {
             this.fortuneLevel = Math.max(0, fortuneLevel);
         }
 
-        private boolean tick(ServerLevel level) {
-            if (level.dimension() != dimension) return false;
-            if (player.isRemoved() || player.hasDisconnected() || player.level() != level) {
-                preserveCollected();
-                return true;
-            }
-
-            scanAndBreak(level);
-            if (cursor >= totalPositions) {
-                dropCollected(level);
-                collected.clear();
-                return true;
-            }
-            return false;
-        }
-
-        private void scanAndBreak(ServerLevel level) {
+        private ScanProgress tick(ServerLevel level, int positionBudget, int blockBudget) {
             int scanned = 0;
             int broken = 0;
-            while (cursor < totalPositions && scanned < POSITIONS_PER_TICK && broken < BLOCKS_PER_TICK) {
+            while (cursor < totalPositions && scanned < positionBudget && broken < blockBudget) {
                 int index = cursor++;
                 scanned++;
                 scanPos.set(originX + ScanLayout.offsetX(index, side), originY + ScanLayout.offsetY(index, side),
@@ -164,6 +176,13 @@ public final class RemoteMiningManager {
                     broken++;
                 }
             }
+
+            boolean finished = cursor >= totalPositions;
+            if (finished) {
+                dropCollected(level);
+                collected.clear();
+            }
+            return new ScanProgress(scanned, broken, finished);
         }
 
         private void preserveCollected() {
@@ -209,6 +228,8 @@ public final class RemoteMiningManager {
             }
         }
     }
+
+    private record ScanProgress(int scanned, int broken, boolean finished) {}
 
     private record TargetSpec(Map<Block, Item> rewards, Item fallbackReward) {
         static TargetSpec sameReward(Set<Block> blocks, Item reward) {
