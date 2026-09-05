@@ -11,6 +11,8 @@ import net.minecraft.world.phys.AABB;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -19,6 +21,9 @@ public final class TaczDirectEventRuntime {
     private static final double MAGNET_RADIUS = 3.0D;
     private static final int FRESH_ENTITY_TICKS = 8;
     private static final AtomicBoolean REGISTERED = new AtomicBoolean(false);
+    private static final ConcurrentHashMap<MethodKey, Optional<Method>> METHOD_CACHE = new ConcurrentHashMap<>();
+
+    private record MethodKey(Class<?> type, String name) {}
 
     private TaczDirectEventRuntime() {}
 
@@ -131,8 +136,15 @@ public final class TaczDirectEventRuntime {
     private static Object invoke(Object target, String name) {
         if (target == null) return null;
         try {
-            Method method = target.getClass().getMethod(name);
-            return method.invoke(target);
+            Optional<Method> cached = METHOD_CACHE.computeIfAbsent(new MethodKey(target.getClass(), name), key -> {
+                try {
+                    return Optional.of(key.type().getMethod(key.name()));
+                } catch (ReflectiveOperationException | RuntimeException ignored) {
+                    return Optional.empty();
+                }
+            });
+            if (cached.isEmpty()) return null;
+            return cached.get().invoke(target);
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             return null;
         }
