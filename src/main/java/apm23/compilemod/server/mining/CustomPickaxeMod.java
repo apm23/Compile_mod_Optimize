@@ -56,7 +56,7 @@ public final class CustomPickaxeMod implements ModInitializer {
             RemoteMiningManager.start(serverPlayer, pos, type, GlobalPickaxeState.sideForLevel(miningLevel, type));
         });
 
-        ServerTickEvents.END_LEVEL_TICK.register(RemoteMiningManager::tick);
+        ServerTickEvents.END_SERVER_TICK.register(RemoteMiningManager::tick);
         LOGGER.info("Custom Pickaxe server-side mod initialized");
     }
 
