@@ -48,6 +48,7 @@ public final class LinkedShulkerBlock extends BaseEntityBlock {
 
     @Override
     public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+        if (level.isClientSide()) return null;
         return createTickerHelper(type, ModBlockEntities.LINKED_SHULKER, LinkedShulkerBlockEntity::serverTick);
     }
 
