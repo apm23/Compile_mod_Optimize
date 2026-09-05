@@ -7,7 +7,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -21,6 +20,8 @@ public final class TaczEnchantRuntime {
     private static final float[] LIFE_STEAL_RATIOS = {0.0F, 0.05F, 0.075F, 0.10F};
     public static final float ABSORPTION_RATIO = 0.50F;
     public static final float MAX_ABSORPTION_HEALTH = 4.0F;
+    private static final Identifier ENDER_DRAGON_ID = Identifier.fromNamespaceAndPath("minecraft", "ender_dragon");
+    private static final Identifier WITHER_ID = Identifier.fromNamespaceAndPath("minecraft", "wither");
 
     private TaczEnchantRuntime() {}
 
@@ -84,7 +85,7 @@ public final class TaczEnchantRuntime {
     }
 
     public static boolean sharedBossReward(LivingEntity victim) {
-        EntityType<?> type = victim.getType();
-        return type == EntityType.ENDER_DRAGON || type == EntityType.WITHER;
+        Identifier id = BuiltInRegistries.ENTITY_TYPE.getKey(victim.getType());
+        return ENDER_DRAGON_ID.equals(id) || WITHER_ID.equals(id);
     }
 }
