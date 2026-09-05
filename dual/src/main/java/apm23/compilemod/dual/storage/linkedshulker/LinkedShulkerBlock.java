@@ -54,9 +54,7 @@ public final class LinkedShulkerBlock extends BaseEntityBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        if (!level.isClientSide() && level.getBlockEntity(pos) instanceof LinkedShulkerBlockEntity be) {
-            player.openMenu(be);
-        }
+        if (!level.isClientSide() && level.getBlockEntity(pos) instanceof LinkedShulkerBlockEntity be) player.openMenu(be);
         return InteractionResult.SUCCESS;
     }
 
@@ -67,17 +65,13 @@ public final class LinkedShulkerBlock extends BaseEntityBlock {
             Component custom = stack.get(DataComponents.CUSTOM_NAME);
             be.setChannel(custom == null ? "default" : custom.getString());
         }
-        if (level instanceof ServerLevel server) {
-            refreshChunkAnchor(server, pos);
-        }
+        if (level instanceof ServerLevel server) refreshChunkAnchor(server, pos);
     }
 
     @Override
     protected void neighborChanged(BlockState state, Level level, BlockPos pos, net.minecraft.world.level.block.Block neighborBlock, @Nullable net.minecraft.world.level.redstone.Orientation orientation, boolean movedByPiston) {
         super.neighborChanged(state, level, pos, neighborBlock, orientation, movedByPiston);
-        if (level instanceof ServerLevel server) {
-            refreshChunkAnchor(server, pos);
-        }
+        if (level instanceof ServerLevel server) refreshChunkAnchor(server, pos);
     }
 
     @Override
@@ -98,18 +92,18 @@ public final class LinkedShulkerBlock extends BaseEntityBlock {
 
     private static boolean hasAdjacentHopper(ServerLevel level, BlockPos pos) {
         for (Direction direction : Direction.values()) {
-            if (level.getBlockEntity(pos.relative(direction)) instanceof HopperBlockEntity) {
-                return true;
-            }
+            if (level.getBlockEntity(pos.relative(direction)) instanceof HopperBlockEntity) return true;
         }
         return false;
     }
 
     private static boolean chunkNeedsAnchor(ServerLevel level, BlockPos excludedPos) {
-        return level.getChunkAt(excludedPos).getBlockEntities().entrySet().stream()
-            .filter(entry -> !entry.getKey().equals(excludedPos))
-            .filter(entry -> entry.getValue() instanceof LinkedShulkerBlockEntity)
-            .anyMatch(entry -> hasAdjacentHopper(level, entry.getKey()));
+        for (var entry : level.getChunkAt(excludedPos).getBlockEntities().entrySet()) {
+            if (entry.getKey().equals(excludedPos)) continue;
+            if (!(entry.getValue() instanceof LinkedShulkerBlockEntity)) continue;
+            if (hasAdjacentHopper(level, entry.getKey())) return true;
+        }
+        return false;
     }
 
     private static void refreshChunkAnchor(ServerLevel level, BlockPos pos) {
