@@ -24,7 +24,7 @@ public final class ModPayloads {
         public static final Type<HiddenRecipeContents> TYPE=new Type<>(CustomHotbarInventory.id("hidden_recipe_contents"));
         public static final StreamCodec<RegistryFriendlyByteBuf,HiddenRecipeContents> CODEC=StreamCodec.of(
             (buf,p)->ItemStack.OPTIONAL_LIST_STREAM_CODEC.encode(buf,p.stacks),
-            buf->new HiddenRecipeContents(List.copyOf(ItemStack.OPTIONAL_LIST_STREAM_CODEC.decode(buf)))
+            buf->new HiddenRecipeContents(ItemStack.OPTIONAL_LIST_STREAM_CODEC.decode(buf))
         );
         public HiddenRecipeContents { stacks=List.copyOf(stacks); }
         @Override public Type<? extends CustomPacketPayload> type(){return TYPE;}
