@@ -63,6 +63,8 @@ jobs:
           require_class /tmp/dual-jar.txt 'HiddenRecipeContentsClient'
           require_class /tmp/dual-jar.txt 'MerchantMenuMixin'
           require_class /tmp/dual-jar.txt 'ServerPlaceRecipeMixin'
+          require_class /tmp/dual-jar.txt 'TaczCraftingCompat'
+          require_class /tmp/dual-jar.txt 'TaczCraftingClientBridge'
           require_class /tmp/dual-jar.txt 'TaczGunSmithTableMenuMixin'
           require_class /tmp/dual-jar.txt 'GodHorseRuntime'
           require_class /tmp/dual-jar.txt 'StormcallRuntime'
@@ -73,36 +75,33 @@ jobs:
           require_entry /tmp/dual-jar.txt 'assets/linkedshulker/models/block/linked_shulker_box_open_7.json'
           require_entry /tmp/dual-jar.txt 'assets/linkedshulker/models/item/linked_shulker_box.json'
 
-          # Keep unchanged interaction paths byte-for-byte locked to the proven standalone build.
-          # HiddenRecipeContentsClient now intentionally diverges for the low-overhead client cache,
-          # so it is guarded by explicit source invariants below instead of a stale golden checksum.
+          # This hook itself was not changed by the optimization pass; keep it byte-locked.
           rm -rf /tmp/inventory-proven-audit
           mkdir -p /tmp/inventory-proven-audit
           (
             cd /tmp/inventory-proven-audit
-            jar xf "$GITHUB_WORKSPACE/$dual_jar" \
-              com/anjas/custominventory/mixin/ServerPlaceRecipeMixin.class \
-              com/anjas/custominventory/TaczCraftingCompat.class \
-              com/anjas/custominventory/client/TaczCraftingClientBridge.class \
-              com/anjas/custominventory/mixin/TaczGunSmithTableMenuMixin.class
+            jar xf "$GITHUB_WORKSPACE/$dual_jar" com/anjas/custominventory/mixin/TaczGunSmithTableMenuMixin.class
           )
           cat > /tmp/inventory-proven.sha256 <<'EOF'
-          12f96d52094b1884817798ac8792b07a80f5123f3fdd97ac4372a946f0939a7b  /tmp/inventory-proven-audit/com/anjas/custominventory/mixin/ServerPlaceRecipeMixin.class
-          2a4febaeefcc257bdadc07c304855663622a7056dba2b5221f9e045d8d949b90  /tmp/inventory-proven-audit/com/anjas/custominventory/TaczCraftingCompat.class
-          3ee226556c9c09e4ee74d5f9d9072cb91af8b111f1e443224dd177ec069cc618  /tmp/inventory-proven-audit/com/anjas/custominventory/client/TaczCraftingClientBridge.class
           fa03fc9200a2c64181d72eb194cf8fd8b9795fbc1b53041a5c7d6a5e8235cbf0  /tmp/inventory-proven-audit/com/anjas/custominventory/mixin/TaczGunSmithTableMenuMixin.class
           EOF
           sha256sum --check --strict /tmp/inventory-proven.sha256
 
-          # Survival-fix invariants plus low-overhead hidden-inventory cache invariants.
+          # Behaviour-preserving invariants for paths intentionally optimized in this audit.
           grep -Fq 'player.containerMenu.setCarried(carried.copy())' dual/src/main/java/apm23/compilemod/dual/inventory/api/InventoryStorage.java
           grep -Fq 'pendingPageCarried=client.player==null?ItemStack.EMPTY:client.player.containerMenu.getCarried().copy()' dual/src/main/java/apm23/compilemod/dual/inventory/client/CustomHotbarInventoryClient.java
           grep -Fq 'client.player.containerMenu.setCarried(pendingPageCarried.copy())' dual/src/main/java/apm23/compilemod/dual/inventory/client/CustomHotbarInventoryClient.java
           grep -Fq 'public static List<ItemStack> view(){return hiddenStacks;}' dual/src/main/java/apm23/compilemod/dual/inventory/client/HiddenRecipeContentsClient.java
           grep -Fq 'public static long revision(){return revision;}' dual/src/main/java/apm23/compilemod/dual/inventory/client/HiddenRecipeContentsClient.java
           grep -Fq 'private static boolean canReorganizePages(ServerPlayer p){return p.containerMenu==p.inventoryMenu;}' dual/src/main/java/apm23/compilemod/dual/inventory/core/CustomHotbarInventory.java
-          ! grep -Fq 'canReorganizePages(ServerPlayer p){return p.containerMenu==p.inventoryMenu&&p.containerMenu.getCarried().isEmpty();}' dual/src/main/java/apm23/compilemod/dual/inventory/core/CustomHotbarInventory.java
+          grep -Fq 'routeOverflowAndReport(p)' dual/src/main/java/apm23/compilemod/dual/inventory/core/CustomHotbarInventory.java
           grep -Fq 'custominventory$returnMerchantStackAcrossPages' dual/src/main/java/apm23/compilemod/dual/inventory/mixin/MerchantMenuMixin.java
+          grep -Fq 'InventoryStorage.forEachStoredStack(player, page, contents::accountSimpleStack)' dual/src/main/java/apm23/compilemod/dual/inventory/mixin/ServerPlaceRecipeMixin.java
+          grep -Fq 'SCAN_ORDERS' dual/src/main/java/apm23/compilemod/dual/inventory/compat/tacz/TaczCraftingCompat.java
+          grep -Fq 'RECIPE_ACCESS.computeIfAbsent' dual/src/main/java/apm23/compilemod/dual/inventory/compat/tacz/TaczCraftingCompat.java
+          grep -Fq 'HiddenRecipeContentsClient.view()' dual/src/main/java/apm23/compilemod/dual/inventory/compat/tacz/client/TaczCraftingClientBridge.java
+          grep -Fq 'SCREEN_ACCESS.computeIfAbsent' dual/src/main/java/apm23/compilemod/dual/inventory/compat/tacz/client/TaczCraftingClientBridge.java
+          ! grep -Fq 'canReorganizePages(ServerPlayer p){return p.containerMenu==p.inventoryMenu&&p.containerMenu.getCarried().isEmpty();}' dual/src/main/java/apm23/compilemod/dual/inventory/core/CustomHotbarInventory.java
 
           if grep -Eq '^(com/tacz/|com/simibubi/create/)' /tmp/dual-jar.txt /tmp/server-jar.txt; then
             echo 'Forbidden TACZ/Create implementation classes were bundled.'
