@@ -14,29 +14,30 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Optional TACZ gun-smith-table compatibility for the paged inventory. */
 public final class TaczCraftingCompat {
     private static final String TACZ_MOD_ID = "tacz";
     private static final int[][] SCAN_ORDERS = buildScanOrders();
+    private static final ConcurrentHashMap<Class<?>, Method> GET_RECIPE = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Class<?>, RecipeAccess> RECIPE_ACCESS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Class<?>, InputAccess> INPUT_ACCESS = new ConcurrentHashMap<>();
+    private static volatile RefreshAccess refreshAccess;
+    private static volatile boolean refreshResolved;
 
     private TaczCraftingCompat() {}
 
     public static boolean handleCraft(Object menu, Identifier recipeId, Player player) {
-        if (!FabricLoader.getInstance().isModLoaded(TACZ_MOD_ID) || !(player instanceof ServerPlayer serverPlayer)) {
-            return false;
-        }
+        if (!FabricLoader.getInstance().isModLoaded(TACZ_MOD_ID) || !(player instanceof ServerPlayer serverPlayer)) return false;
         try {
-            Method getRecipe = menu.getClass().getDeclaredMethod("getRecipe", Identifier.class);
-            getRecipe.setAccessible(true);
+            Method getRecipe = GET_RECIPE.computeIfAbsent(menu.getClass(), TaczCraftingCompat::resolveGetRecipe);
             Object recipe = getRecipe.invoke(menu, recipeId);
             if (recipe == null) return true;
 
-            Method getInputs = recipe.getClass().getMethod("getInputs");
-            Method getOutput = recipe.getClass().getMethod("getOutput");
-            @SuppressWarnings("unchecked")
-            List<Object> inputs = (List<Object>) getInputs.invoke(recipe);
-            ItemStack output = ((ItemStack) getOutput.invoke(recipe)).copy();
+            RecipeAccess recipeAccess = RECIPE_ACCESS.computeIfAbsent(recipe.getClass(), TaczCraftingCompat::resolveRecipeAccess);
+            @SuppressWarnings("unchecked") List<Object> inputs = (List<Object>) recipeAccess.getInputs.invoke(recipe);
+            ItemStack output = ((ItemStack) recipeAccess.getOutput.invoke(recipe)).copy();
             if (output.isEmpty()) return true;
 
             PagedView view = new PagedView(serverPlayer);
@@ -56,19 +57,49 @@ public final class TaczCraftingCompat {
             serverPlayer.inventoryMenu.broadcastFullState();
             sendCraftRefresh(menu, serverPlayer);
             return true;
-        } catch (ReflectiveOperationException | LinkageError e) {
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
             CustomHotbarInventory.LOGGER.warn("TACZ workbench compatibility failed; falling back to TACZ's native crafting path", e);
             return false;
+        }
+    }
+
+    private static Method resolveGetRecipe(Class<?> type) {
+        try {
+            Method method = type.getDeclaredMethod("getRecipe", Identifier.class);
+            method.setAccessible(true);
+            return method;
+        } catch (ReflectiveOperationException e) {
+            throw new ReflectionResolutionException(e);
+        }
+    }
+
+    private static RecipeAccess resolveRecipeAccess(Class<?> type) {
+        try {
+            return new RecipeAccess(type.getMethod("getInputs"), type.getMethod("getOutput"));
+        } catch (ReflectiveOperationException e) {
+            throw new ReflectionResolutionException(e);
+        }
+    }
+
+    private static InputAccess resolveInputAccess(Class<?> type) {
+        try {
+            return new InputAccess(type.getMethod("getIngredient"), type.getMethod("getCount"));
+        } catch (ReflectiveOperationException e) {
+            throw new ReflectionResolutionException(e);
         }
     }
 
     private static boolean reserveAndConsume(PagedView view, List<Object> inputs) throws ReflectiveOperationException {
         int[] reserved = new int[view.size()];
         for (Object input : inputs) {
-            Method getIngredient = input.getClass().getMethod("getIngredient");
-            Method getCount = input.getClass().getMethod("getCount");
-            Ingredient ingredient = (Ingredient) getIngredient.invoke(input);
-            int needed = Math.max(0, ((Number) getCount.invoke(input)).intValue());
+            InputAccess access;
+            try {
+                access = INPUT_ACCESS.computeIfAbsent(input.getClass(), TaczCraftingCompat::resolveInputAccess);
+            } catch (ReflectionResolutionException e) {
+                throw new ReflectiveOperationException(e.getCause());
+            }
+            Ingredient ingredient = (Ingredient) access.getIngredient.invoke(input);
+            int needed = Math.max(0, ((Number) access.getCount.invoke(input)).intValue());
             if (ingredient == null) return false;
 
             int remaining = needed;
@@ -78,10 +109,7 @@ public final class TaczCraftingCompat {
                 if (stack.isEmpty() || !ingredient.test(stack)) continue;
                 int available = Math.max(0, stack.getCount() - reserved[slot]);
                 int take = Math.min(available, remaining);
-                if (take > 0) {
-                    reserved[slot] += take;
-                    remaining -= take;
-                }
+                if (take > 0) { reserved[slot] += take; remaining -= take; }
             }
             if (remaining > 0) return false;
         }
@@ -122,17 +150,30 @@ public final class TaczCraftingCompat {
 
     private static void sendCraftRefresh(Object menu, ServerPlayer player) {
         try {
-            Field containerId = net.minecraft.world.inventory.AbstractContainerMenu.class.getField("containerId");
-            int id = containerId.getInt(menu);
-            Class<?> messageClass = Class.forName("com.tacz.guns.network.message.ServerMessageCraft");
-            Constructor<?> ctor = messageClass.getConstructor(int.class);
-            Object message = ctor.newInstance(id);
-            if (!(message instanceof CustomPacketPayload payload)) return;
-            Class<?> handler = Class.forName("com.tacz.guns.network.NetworkHandler");
-            Method send = handler.getMethod("sendToClientPlayer", CustomPacketPayload.class, ServerPlayer.class);
-            send.invoke(null, payload, player);
+            RefreshAccess access = resolveRefreshAccess();
+            if (access == null) return;
+            int id = access.containerId.getInt(menu);
+            Object message = access.messageCtor.newInstance(id);
+            if (message instanceof CustomPacketPayload payload) access.send.invoke(null, payload, player);
         } catch (ReflectiveOperationException | LinkageError e) {
             CustomHotbarInventory.LOGGER.debug("Could not send TACZ workbench refresh packet", e);
+        }
+    }
+
+    private static RefreshAccess resolveRefreshAccess() {
+        if (refreshResolved) return refreshAccess;
+        synchronized (TaczCraftingCompat.class) {
+            if (refreshResolved) return refreshAccess;
+            try {
+                Field containerId = net.minecraft.world.inventory.AbstractContainerMenu.class.getField("containerId");
+                Constructor<?> ctor = Class.forName("com.tacz.guns.network.message.ServerMessageCraft").getConstructor(int.class);
+                Method send = Class.forName("com.tacz.guns.network.NetworkHandler").getMethod("sendToClientPlayer", CustomPacketPayload.class, ServerPlayer.class);
+                refreshAccess = new RefreshAccess(containerId, ctor, send);
+            } catch (ReflectiveOperationException | LinkageError e) {
+                refreshAccess = null;
+            }
+            refreshResolved = true;
+            return refreshAccess;
         }
     }
 
@@ -161,9 +202,7 @@ public final class TaczCraftingCompat {
             this.player = player;
             InventoryStorage.snapshotLive(player);
             this.activePage = InventoryStorage.active(player);
-            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
-                pages.add(page == activePage ? List.of() : new ArrayList<>(InventoryStorage.read(player, page)));
-            }
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) pages.add(page == activePage ? List.of() : new ArrayList<>(InventoryStorage.read(player, page)));
             this.scanOrder = SCAN_ORDERS[activePage];
         }
 
@@ -173,32 +212,30 @@ public final class TaczCraftingCompat {
         private ItemStack get(int slot) {
             if (slot < 0 || slot >= size()) return ItemStack.EMPTY;
             if (slot < 9) return player.getInventory().getItem(slot);
-            int linear = slot - 9;
-            int page = linear / InventoryStorage.PAGE_SIZE;
-            int index = linear % InventoryStorage.PAGE_SIZE;
+            int linear = slot - 9, page = linear / InventoryStorage.PAGE_SIZE, index = linear % InventoryStorage.PAGE_SIZE;
             if (page == activePage) return player.getInventory().getItem(InventoryStorage.MAIN_START + index);
             return pages.get(page).get(index);
         }
 
         private void set(int slot, ItemStack stack) {
             if (slot < 0 || slot >= size()) return;
-            if (slot < 9) {
-                player.getInventory().setItem(slot, stack);
-                return;
-            }
-            int linear = slot - 9;
-            int page = linear / InventoryStorage.PAGE_SIZE;
-            int index = linear % InventoryStorage.PAGE_SIZE;
+            if (slot < 9) { player.getInventory().setItem(slot, stack); return; }
+            int linear = slot - 9, page = linear / InventoryStorage.PAGE_SIZE, index = linear % InventoryStorage.PAGE_SIZE;
             if (page == activePage) player.getInventory().setItem(InventoryStorage.MAIN_START + index, stack);
             else pages.get(page).set(index, stack);
         }
 
         private void commit() {
-            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
-                if (page != activePage) InventoryStorage.write(player, page, pages.get(page));
-            }
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) if (page != activePage) InventoryStorage.write(player, page, pages.get(page));
             InventoryStorage.snapshotLive(player);
             player.getInventory().setChanged();
         }
+    }
+
+    private record RecipeAccess(Method getInputs, Method getOutput) {}
+    private record InputAccess(Method getIngredient, Method getCount) {}
+    private record RefreshAccess(Field containerId, Constructor<?> messageCtor, Method send) {}
+    private static final class ReflectionResolutionException extends RuntimeException {
+        private ReflectionResolutionException(Throwable cause) { super(cause); }
     }
 }
