@@ -74,6 +74,7 @@ public abstract class GodHorseOptimizedMixin {
     @Inject(method = "aiStep", at = @At("TAIL"))
     private void godvillagers$optimizedGodHorseTick(CallbackInfo ci) {
         SkeletonHorse horse = godvillagers$self();
+        if (horse.level().isClientSide()) return;
         if (!godvillagers$isGodHorse(horse)) return;
         godvillagers$initializeOnce(horse);
         horse.clearFire();
