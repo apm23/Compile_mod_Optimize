@@ -3,15 +3,15 @@ package com.anjas.godvillagers;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
-
-import java.util.Locale;
 
 /** Optional TACZ enchant runtime with strict per-shooter ownership. */
 public final class TaczEnchantRuntime {
@@ -68,8 +68,10 @@ public final class TaczEnchantRuntime {
 
     public static boolean looksLikeTaczGun(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
-        String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString().toLowerCase(Locale.ROOT);
-        return id.startsWith("tacz:") || id.contains(":tacz_") || id.contains("tacz");
+        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        String namespace = id.getNamespace();
+        String path = id.getPath();
+        return namespace.contains("tacz") || path.contains("tacz");
     }
 
     public static int enchantLevel(ItemStack stack, String wantedId) {
@@ -82,7 +84,7 @@ public final class TaczEnchantRuntime {
     }
 
     public static boolean sharedBossReward(LivingEntity victim) {
-        String id = victim.getType().toString().toLowerCase(Locale.ROOT);
-        return id.contains("ender_dragon") || id.contains("wither");
+        EntityType<?> type = victim.getType();
+        return type == EntityType.ENDER_DRAGON || type == EntityType.WITHER;
     }
 }
