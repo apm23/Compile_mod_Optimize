@@ -12,7 +12,13 @@ public final class HiddenRecipeContentsClient {
     private HiddenRecipeContentsClient() {}
 
     public static void replace(List<ItemStack> stacks){
-        hiddenStacks=stacks.stream().map(ItemStack::copy).toList();
+        // Hidden recipe/TACZ consumers only care about item contents, never physical slot positions.
+        // Drop empty entries once at packet-receive time so all later recipe/HUD scans iterate only
+        // meaningful stacks while preserving exact counts/components of every non-empty stack.
+        hiddenStacks=stacks.stream()
+                .filter(stack -> stack != null && !stack.isEmpty())
+                .map(ItemStack::copy)
+                .toList();
         revision++;
     }
 
