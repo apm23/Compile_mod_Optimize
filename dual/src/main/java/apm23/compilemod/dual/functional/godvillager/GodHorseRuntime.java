@@ -23,14 +23,6 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
 
-/**
- * Proven alpha.81 God Horse runtime. Keeps the alpha.73 unsinkable behavior while
- * using synchronized server teleports for recovery so a controlling rider cannot
- * overwrite the horse's surface correction on the next vehicle movement update.
- *
- * The old 16-pass command behavior is preserved, with an early exit when no rule
- * moved the horse. This is the only intentional optimization: same result, less work.
- */
 public final class GodHorseRuntime {
     private static final String TAG = "godvillagers_god_horse";
     private static final String INIT_TAG = "godvillagers_god_horse_initialized_clean";
@@ -120,14 +112,20 @@ public final class GodHorseRuntime {
         horse.addTag(INIT_TAG);
     }
 
-    private static boolean waterAt(SkeletonHorse horse, int yOffset) { return fluidAt(horse, yOffset).is(FluidTags.WATER); }
-    private static boolean lavaAt(SkeletonHorse horse, int yOffset) { return fluidAt(horse, yOffset).is(FluidTags.LAVA); }
+    private static boolean waterAt(SkeletonHorse horse, int yOffset, BlockPos.MutableBlockPos probe) {
+        return fluidAt(horse, yOffset, probe).is(FluidTags.WATER);
+    }
 
-    private static FluidState fluidAt(SkeletonHorse horse, int yOffset) {
+    private static boolean lavaAt(SkeletonHorse horse, int yOffset, BlockPos.MutableBlockPos probe) {
+        return fluidAt(horse, yOffset, probe).is(FluidTags.LAVA);
+    }
+
+    private static FluidState fluidAt(SkeletonHorse horse, int yOffset, BlockPos.MutableBlockPos probe) {
         int x = (int) Math.floor(horse.getX());
         int y = (int) Math.floor(horse.getY()) + yOffset;
         int z = (int) Math.floor(horse.getZ());
-        return horse.level().getFluidState(new BlockPos(x, y, z));
+        probe.set(x, y, z);
+        return horse.level().getFluidState(probe);
     }
 
     private static boolean teleportUpOne(SkeletonHorse horse) {
@@ -141,24 +139,24 @@ public final class GodHorseRuntime {
         return moved;
     }
 
-    private static void alpha73Recovery(SkeletonHorse horse) {
+    private static void alpha73Recovery(SkeletonHorse horse, BlockPos.MutableBlockPos probe) {
         for (int i = 0; i < MAX_RECOVERY_STEPS; i++) {
             boolean moved = false;
-            if (waterAt(horse, 0)) moved |= teleportUpOne(horse);
-            if (lavaAt(horse, 0)) moved |= teleportUpOne(horse);
-            if (!waterAt(horse, 0) && waterAt(horse, 1) && !waterAt(horse, -1)) moved |= teleportUpOne(horse);
-            if (!lavaAt(horse, 0) && lavaAt(horse, 1) && !lavaAt(horse, -1)) moved |= teleportUpOne(horse);
-            if (!waterAt(horse, 0) && !waterAt(horse, 1) && waterAt(horse, 2) && !waterAt(horse, -1)) moved |= teleportUpOne(horse);
-            if (!lavaAt(horse, 0) && !lavaAt(horse, 1) && lavaAt(horse, 2) && !lavaAt(horse, -1)) moved |= teleportUpOne(horse);
+            if (waterAt(horse, 0, probe)) moved |= teleportUpOne(horse);
+            if (lavaAt(horse, 0, probe)) moved |= teleportUpOne(horse);
+            if (!waterAt(horse, 0, probe) && waterAt(horse, 1, probe) && !waterAt(horse, -1, probe)) moved |= teleportUpOne(horse);
+            if (!lavaAt(horse, 0, probe) && lavaAt(horse, 1, probe) && !lavaAt(horse, -1, probe)) moved |= teleportUpOne(horse);
+            if (!waterAt(horse, 0, probe) && !waterAt(horse, 1, probe) && waterAt(horse, 2, probe) && !waterAt(horse, -1, probe)) moved |= teleportUpOne(horse);
+            if (!lavaAt(horse, 0, probe) && !lavaAt(horse, 1, probe) && lavaAt(horse, 2, probe) && !lavaAt(horse, -1, probe)) moved |= teleportUpOne(horse);
             if (!moved) break;
         }
     }
 
-    private static void alpha73SurfaceLock(SkeletonHorse horse) {
-        boolean feetInWater = waterAt(horse, 0);
-        boolean feetInLava = lavaAt(horse, 0);
-        boolean waterBelow = waterAt(horse, -1);
-        boolean lavaBelow = lavaAt(horse, -1);
+    private static void alpha73SurfaceLock(SkeletonHorse horse, BlockPos.MutableBlockPos probe) {
+        boolean feetInWater = waterAt(horse, 0, probe);
+        boolean feetInLava = lavaAt(horse, 0, probe);
+        boolean waterBelow = waterAt(horse, -1, probe);
+        boolean lavaBelow = lavaAt(horse, -1, probe);
         boolean onFluidSurface = (!feetInWater && waterBelow) || (!feetInLava && lavaBelow);
         if (onFluidSurface) {
             Vec3 velocity = horse.getDeltaMovement();
@@ -176,7 +174,8 @@ public final class GodHorseRuntime {
     private static void tickHorse(SkeletonHorse horse) {
         if (!horse.entityTags().contains(INIT_TAG)) initialize(horse);
         horse.clearFire();
-        alpha73Recovery(horse);
-        alpha73SurfaceLock(horse);
+        BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
+        alpha73Recovery(horse, probe);
+        alpha73SurfaceLock(horse, probe);
     }
 }
