@@ -99,7 +99,8 @@ public final class InventoryStorage {
         return normalizedCopy(target(player).getAttachedOrElse(PAGES[page], List.of()), PAGE_SIZE);
     }
 
-    static void forEachStoredStack(ServerPlayer player, int page, Consumer<ItemStack> consumer) {
+    /** Read-only traversal of stored stack references; callers must never mutate the supplied stacks. */
+    public static void forEachStoredStack(ServerPlayer player, int page, Consumer<ItemStack> consumer) {
         validatePage(page);
         List<ItemStack> stored = target(player).getAttachedOrElse(PAGES[page], List.of());
         int limit = Math.min(PAGE_SIZE, stored.size());
