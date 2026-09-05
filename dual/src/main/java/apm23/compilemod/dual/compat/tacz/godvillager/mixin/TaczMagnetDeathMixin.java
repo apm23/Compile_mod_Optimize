@@ -28,9 +28,7 @@ public abstract class TaczMagnetDeathMixin {
     private Set<Integer> godvillagers$itemsBefore;
     private Set<Integer> godvillagers$xpBefore;
     private int godvillagers$magnetTicksLeft;
-    private double godvillagers$deathX;
-    private double godvillagers$deathY;
-    private double godvillagers$deathZ;
+    private AABB godvillagers$rewardBox;
 
     @Inject(method = "die", at = @At("HEAD"), require = 0)
     private void godvillagers$resolveMagnetOwner(DamageSource source, CallbackInfo ci) {
@@ -44,14 +42,13 @@ public abstract class TaczMagnetDeathMixin {
 
         godvillagers$magnetShooter = shooter.getUUID();
         godvillagers$magnetTicksLeft = MAGNET_CAPTURE_TICKS;
-        godvillagers$deathX = victim.getX();
-        godvillagers$deathY = victim.getY();
-        godvillagers$deathZ = victim.getZ();
-        AABB box = godvillagers$rewardBox();
+        double x = victim.getX(), y = victim.getY(), z = victim.getZ();
+        godvillagers$rewardBox = new AABB(x - REWARD_CAPTURE_RADIUS, y - REWARD_CAPTURE_RADIUS, z - REWARD_CAPTURE_RADIUS,
+                x + REWARD_CAPTURE_RADIUS, y + REWARD_CAPTURE_RADIUS, z + REWARD_CAPTURE_RADIUS);
         godvillagers$itemsBefore = new HashSet<>();
-        for (ItemEntity entity : level.getEntitiesOfClass(ItemEntity.class, box)) godvillagers$itemsBefore.add(entity.getId());
+        for (ItemEntity entity : level.getEntitiesOfClass(ItemEntity.class, godvillagers$rewardBox)) godvillagers$itemsBefore.add(entity.getId());
         godvillagers$xpBefore = new HashSet<>();
-        for (ExperienceOrb orb : level.getEntitiesOfClass(ExperienceOrb.class, box)) godvillagers$xpBefore.add(orb.getId());
+        for (ExperienceOrb orb : level.getEntitiesOfClass(ExperienceOrb.class, godvillagers$rewardBox)) godvillagers$xpBefore.add(orb.getId());
     }
 
     @Inject(method = "die", at = @At("RETURN"), require = 0)
@@ -69,14 +66,14 @@ public abstract class TaczMagnetDeathMixin {
     private void godvillagers$deliverNewRewards() {
         LivingEntity victim = (LivingEntity)(Object)this;
         UUID shooterId = godvillagers$magnetShooter;
-        if (shooterId == null || !(victim.level() instanceof ServerLevel level)) return;
+        AABB box = godvillagers$rewardBox;
+        if (shooterId == null || box == null || !(victim.level() instanceof ServerLevel level)) return;
         ServerPlayer shooter = level.getServer().getPlayerList().getPlayer(shooterId);
         if (shooter == null || shooter.level() != level) {
             godvillagers$clearCapture();
             return;
         }
 
-        AABB box = godvillagers$rewardBox();
         for (ItemEntity entity : level.getEntitiesOfClass(ItemEntity.class, box)) {
             if (godvillagers$itemsBefore == null || godvillagers$itemsBefore.contains(entity.getId())) continue;
             godvillagers$itemsBefore.add(entity.getId());
@@ -102,15 +99,11 @@ public abstract class TaczMagnetDeathMixin {
         }
     }
 
-    private AABB godvillagers$rewardBox() {
-        return new AABB(godvillagers$deathX - REWARD_CAPTURE_RADIUS, godvillagers$deathY - REWARD_CAPTURE_RADIUS, godvillagers$deathZ - REWARD_CAPTURE_RADIUS,
-                godvillagers$deathX + REWARD_CAPTURE_RADIUS, godvillagers$deathY + REWARD_CAPTURE_RADIUS, godvillagers$deathZ + REWARD_CAPTURE_RADIUS);
-    }
-
     private void godvillagers$clearCapture() {
         godvillagers$magnetShooter = null;
         godvillagers$itemsBefore = null;
         godvillagers$xpBefore = null;
         godvillagers$magnetTicksLeft = 0;
+        godvillagers$rewardBox = null;
     }
 }
