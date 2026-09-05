@@ -85,7 +85,7 @@ public class GlobalMendingGameTest {
 
         helper.assertTrue(RemoteMiningManager.isSupportedType("diamond"), "diamond remote-mining target is not registered");
         RemoteMiningManager.start(player, origin, "diamond", 8);
-        RemoteMiningManager.tick(level);
+        RemoteMiningManager.tick(level.getServer());
 
         helper.assertTrue(level.getBlockState(origin).isAir(), "remote mining did not break target diamond ore");
         boolean diamondReward = level.getEntitiesOfClass(ItemEntity.class, player.getBoundingBox().inflate(8.0D)).stream()
