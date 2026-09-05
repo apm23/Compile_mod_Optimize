@@ -29,6 +29,7 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
     private String channel = "default";
     private String channelLabel = "default";
     private final NonNullList<ItemStack> fallback = NonNullList.withSize(ChannelStorageData.SIZE, ItemStack.EMPTY);
+    private @Nullable ChannelStorageData serverDataCache;
     private @Nullable NonNullList<ItemStack> serverItemsCache;
     private int viewers = 0;
     private int animationFrame = 0;
@@ -41,18 +42,27 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
     public void setChannel(String rawName) {
         this.channelLabel = ChannelStorageData.displayName(rawName);
         this.channel = ChannelStorageData.normalize(rawName);
-        this.serverItemsCache = null;
+        invalidateServerCache();
         setChanged();
     }
 
     public String channel() { return channel; }
     public String channelLabel() { return channelLabel; }
 
+    private ChannelStorageData serverData(ServerLevel level) {
+        ChannelStorageData cached = serverDataCache;
+        if (cached == null) {
+            cached = ChannelStorageData.get(level.getServer());
+            serverDataCache = cached;
+        }
+        return cached;
+    }
+
     private NonNullList<ItemStack> items() {
         if (level instanceof ServerLevel serverLevel) {
             NonNullList<ItemStack> cached = serverItemsCache;
             if (cached == null) {
-                cached = ChannelStorageData.get(serverLevel.getServer()).inventory(channel);
+                cached = serverData(serverLevel).inventory(channel);
                 serverItemsCache = cached;
             }
             return cached;
@@ -62,11 +72,16 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
 
     private void changed() {
         setChanged();
-        if (level instanceof ServerLevel serverLevel) ChannelStorageData.get(serverLevel.getServer()).setDirty();
+        if (level instanceof ServerLevel serverLevel) serverData(serverLevel).setDirty();
+    }
+
+    private void invalidateServerCache() {
+        serverDataCache = null;
+        serverItemsCache = null;
     }
 
     @Override public int getContainerSize() { return ChannelStorageData.SIZE; }
-    @Override public boolean isEmpty() { return items().stream().allMatch(ItemStack::isEmpty); }
+    @Override public boolean isEmpty() { for (ItemStack stack : items()) if (!stack.isEmpty()) return false; return true; }
     @Override public ItemStack getItem(int slot) { return items().get(slot); }
 
     @Override
@@ -159,6 +174,6 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
         String savedLabel = input.read("channel_label", Codec.STRING).orElse(savedChannel);
         channelLabel = ChannelStorageData.displayName(savedLabel);
         channel = ChannelStorageData.normalize(channelLabel);
-        serverItemsCache = null;
+        invalidateServerCache();
     }
 }
