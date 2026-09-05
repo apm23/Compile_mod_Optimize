@@ -18,13 +18,10 @@ import java.util.List;
 /** Optional TACZ gun-smith-table compatibility for the paged inventory. */
 public final class TaczCraftingCompat {
     private static final String TACZ_MOD_ID = "tacz";
+    private static final int[][] SCAN_ORDERS = buildScanOrders();
 
     private TaczCraftingCompat() {}
 
-    /**
-     * Replaces TACZ's normal workbench craft path when TACZ is present.
-     * Returns true when the call belonged to a server player and was handled here.
-     */
     public static boolean handleCraft(Object menu, Identifier recipeId, Player player) {
         if (!FabricLoader.getInstance().isModLoaded(TACZ_MOD_ID) || !(player instanceof ServerPlayer serverPlayer)) {
             return false;
@@ -43,16 +40,13 @@ public final class TaczCraftingCompat {
             if (output.isEmpty()) return true;
 
             PagedView view = new PagedView(serverPlayer);
-            if (!serverPlayer.isCreative() && !reserveAndConsume(view, inputs)) {
-                return true;
-            }
+            if (!serverPlayer.isCreative() && !reserveAndConsume(view, inputs)) return true;
 
             ItemStack leftover = insert(view, output);
             view.commit();
             InventoryStorage.sync(serverPlayer);
             CustomHotbarInventory.sendHiddenRecipeState(serverPlayer);
 
-            // Preserve TACZ's old fallback semantics only when every virtual page is truly full.
             if (!leftover.isEmpty()) {
                 ItemEntity entity = new ItemEntity(serverPlayer.level(), serverPlayer.getX(), serverPlayer.getY() + 0.5, serverPlayer.getZ(), leftover);
                 entity.setPickUpDelay(0);
@@ -70,18 +64,12 @@ public final class TaczCraftingCompat {
 
     private static boolean reserveAndConsume(PagedView view, List<Object> inputs) throws ReflectiveOperationException {
         int[] reserved = new int[view.size()];
-        ArrayList<Ingredient> ingredients = new ArrayList<>(inputs.size());
-        ArrayList<Integer> neededCounts = new ArrayList<>(inputs.size());
-
-        // First pass is read-only: either every ingredient can be satisfied or nothing is changed.
         for (Object input : inputs) {
             Method getIngredient = input.getClass().getMethod("getIngredient");
             Method getCount = input.getClass().getMethod("getCount");
             Ingredient ingredient = (Ingredient) getIngredient.invoke(input);
             int needed = Math.max(0, ((Number) getCount.invoke(input)).intValue());
             if (ingredient == null) return false;
-            ingredients.add(ingredient);
-            neededCounts.add(needed);
 
             int remaining = needed;
             for (int slot : view.scanOrder()) {
@@ -110,8 +98,6 @@ public final class TaczCraftingCompat {
 
     private static ItemStack insert(PagedView view, ItemStack input) {
         ItemStack remaining = input.copy();
-
-        // Merge first, preferring the visible hotbar/current page before hidden pages.
         for (int slot : view.scanOrder()) {
             if (remaining.isEmpty()) break;
             ItemStack existing = view.get(slot);
@@ -122,8 +108,6 @@ public final class TaczCraftingCompat {
             existing.grow(moved);
             remaining.shrink(moved);
         }
-
-        // Then use empty slots anywhere in the 8-page virtual inventory.
         for (int slot : view.scanOrder()) {
             if (remaining.isEmpty()) break;
             if (!view.get(slot).isEmpty()) continue;
@@ -152,7 +136,21 @@ public final class TaczCraftingCompat {
         }
     }
 
-    /** Hotbar + current page + the seven hidden pages, with hidden-page writes committed atomically. */
+    private static int[][] buildScanOrders() {
+        int total = 9 + InventoryStorage.PAGE_COUNT * InventoryStorage.PAGE_SIZE;
+        int[][] orders = new int[InventoryStorage.PAGE_COUNT][total];
+        for (int active = 0; active < InventoryStorage.PAGE_COUNT; active++) {
+            int cursor = 0;
+            for (int hotbar = 0; hotbar < 9; hotbar++) orders[active][cursor++] = hotbar;
+            for (int i = 0; i < InventoryStorage.PAGE_SIZE; i++) orders[active][cursor++] = 9 + active * InventoryStorage.PAGE_SIZE + i;
+            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
+                if (page == active) continue;
+                for (int i = 0; i < InventoryStorage.PAGE_SIZE; i++) orders[active][cursor++] = 9 + page * InventoryStorage.PAGE_SIZE + i;
+            }
+        }
+        return orders;
+    }
+
     private static final class PagedView {
         private final ServerPlayer player;
         private final int activePage;
@@ -164,22 +162,13 @@ public final class TaczCraftingCompat {
             InventoryStorage.snapshotLive(player);
             this.activePage = InventoryStorage.active(player);
             for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
-                pages.add(new ArrayList<>(InventoryStorage.read(player, page)));
+                pages.add(page == activePage ? List.of() : new ArrayList<>(InventoryStorage.read(player, page)));
             }
-
-            this.scanOrder = new int[size()];
-            int cursor = 0;
-            for (int hotbar = 0; hotbar < 9; hotbar++) scanOrder[cursor++] = hotbar;
-            for (int i = 0; i < InventoryStorage.PAGE_SIZE; i++) scanOrder[cursor++] = pageSlot(activePage, i);
-            for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
-                if (page == activePage) continue;
-                for (int i = 0; i < InventoryStorage.PAGE_SIZE; i++) scanOrder[cursor++] = pageSlot(page, i);
-            }
+            this.scanOrder = SCAN_ORDERS[activePage];
         }
 
         private int size() { return 9 + InventoryStorage.PAGE_COUNT * InventoryStorage.PAGE_SIZE; }
         private int[] scanOrder() { return scanOrder; }
-        private int pageSlot(int page, int index) { return 9 + page * InventoryStorage.PAGE_SIZE + index; }
 
         private ItemStack get(int slot) {
             if (slot < 0 || slot >= size()) return ItemStack.EMPTY;
