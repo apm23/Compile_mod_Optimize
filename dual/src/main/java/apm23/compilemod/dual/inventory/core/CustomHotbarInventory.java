@@ -51,8 +51,13 @@ public final class CustomHotbarInventory implements ModInitializer {
     public static void sendHiddenRecipeState(ServerPlayer p){
         if(!ServerPlayNetworking.canSend(p,ModPayloads.HiddenRecipeContents.TYPE))return;
         int active=InventoryStorage.active(p);
-        ArrayList<ItemStack> hidden=new ArrayList<>((InventoryStorage.PAGE_COUNT-1)*InventoryStorage.PAGE_SIZE);
-        for(int page=0;page<InventoryStorage.PAGE_COUNT;page++)if(page!=active)for(ItemStack stack:InventoryStorage.read(p,page))hidden.add(stack.copy());
+        ArrayList<ItemStack> hidden=new ArrayList<>();
+        for(int page=0;page<InventoryStorage.PAGE_COUNT;page++){
+            if(page==active)continue;
+            // InventoryStorage.read already returns defensive copies. Empty slots have no semantic
+            // value for recipe-book/TACZ reserve-ammo consumers, so omit them from the wire payload.
+            for(ItemStack stack:InventoryStorage.read(p,page))if(!stack.isEmpty())hidden.add(stack);
+        }
         ServerPlayNetworking.send(p,new ModPayloads.HiddenRecipeContents(hidden));
     }
     private static <T extends net.minecraft.network.protocol.common.custom.CustomPacketPayload> void register(net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<T> type,net.minecraft.network.codec.StreamCodec<? super net.minecraft.network.RegistryFriendlyByteBuf,T> codec){PayloadTypeRegistry.serverboundPlay().register(type,codec);}
