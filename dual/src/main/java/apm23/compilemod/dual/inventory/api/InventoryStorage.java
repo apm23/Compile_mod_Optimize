@@ -143,15 +143,33 @@ public final class InventoryStorage {
 
     public static void routeOverflow(ServerPlayer player) {
         if (isBrowsing(player) || player.containerMenu != player.inventoryMenu) return;
-        List<ItemStack> live = liveCopy(player);
-        if (hasEmptySlot(live)) return;
+        if (hasEmptyLiveSlot(player)) return;
         int current = active(player);
         for (int page = 0; page < PAGE_COUNT; page++) {
-            if (page != current && hasEmptySlot(read(player, page))) {
+            if (page != current && hasEmptyStoredSlot(player, page)) {
                 switchPage(player, page);
                 return;
             }
         }
+    }
+
+    private static boolean hasEmptyLiveSlot(ServerPlayer player) {
+        Inventory inv = player.getInventory();
+        for (int i = 0; i < PAGE_SIZE; i++) {
+            if (inv.getItem(MAIN_START + i).isEmpty()) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasEmptyStoredSlot(ServerPlayer player, int page) {
+        validatePage(page);
+        List<ItemStack> stored = target(player).getAttachedOrElse(PAGES[page], List.of());
+        if (stored.size() < PAGE_SIZE) return true;
+        for (int i = 0; i < PAGE_SIZE; i++) {
+            ItemStack stack = stored.get(i);
+            if (stack == null || stack.isEmpty()) return true;
+        }
+        return false;
     }
 
     public static boolean hasEmptySlot(List<ItemStack> page) {
