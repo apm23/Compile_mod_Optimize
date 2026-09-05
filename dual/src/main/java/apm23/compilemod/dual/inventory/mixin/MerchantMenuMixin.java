@@ -22,12 +22,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Replaces vanilla's incremental merchant autofill on the logical server with one transaction
- * across hotbar + all eight inventory pages. The full operation is simulated first so a missing
- * second cost can never partially consume/move the first cost. Once validated, payment slots are
- * filled like vanilla (up to one compatible stack), preserving post-trade change in the slot.
- */
+/** Atomic merchant autofill across hotbar + all eight inventory pages. */
 @Mixin(MerchantMenu.class)
 public abstract class MerchantMenuMixin {
     @Shadow @Final private Merchant trader;
@@ -37,7 +32,6 @@ public abstract class MerchantMenuMixin {
     private void custominventory$atomicPagedTradeFill(int newTradeIndex, CallbackInfo ci) {
         if (!(this.trader.getTradingPlayer() instanceof ServerPlayer player)) return;
         ci.cancel();
-
         if (newTradeIndex < 0 || newTradeIndex >= this.trader.getOffers().size()) return;
 
         InventoryStorage.snapshotLive(player);
@@ -56,14 +50,12 @@ public abstract class MerchantMenuMixin {
         if (offer.getItemCostB().isPresent()
                 && custominventory$extractExact(preflight, offer.getItemCostB().get(), requiredB) == null) return;
 
-        ItemStack paymentA = custominventory$extractPaymentStack(
-                working, offer.getItemCostA(), requiredA);
+        ItemStack paymentA = custominventory$extractPaymentStack(working, offer.getItemCostA(), requiredA);
         if (paymentA == null) return;
 
         ItemStack paymentB = ItemStack.EMPTY;
         if (offer.getItemCostB().isPresent()) {
-            paymentB = custominventory$extractPaymentStack(
-                    working, offer.getItemCostB().get(), requiredB);
+            paymentB = custominventory$extractPaymentStack(working, offer.getItemCostB().get(), requiredB);
             if (paymentB == null) return;
         }
 
@@ -74,17 +66,9 @@ public abstract class MerchantMenuMixin {
         CustomHotbarInventory.sendHiddenRecipeState(player);
     }
 
-    /**
-     * Vanilla 26.2 returns both merchant payment slots on close through
-     * Inventory.placeItemBackInInventory(), which only sees the currently materialized 36 slots.
-     * Redirect that exact call so hidden pages participate before vanilla is allowed to drop.
-     */
     @Redirect(
             method = "removed",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/world/entity/player/Inventory;placeItemBackInInventory(Lnet/minecraft/world/item/ItemStack;)V"
-            )
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Inventory;placeItemBackInInventory(Lnet/minecraft/world/item/ItemStack;)V")
     )
     private void custominventory$returnMerchantStackAcrossPages(Inventory inventory, ItemStack returned) {
         if (returned.isEmpty() || !(inventory.player instanceof ServerPlayer player)) {
@@ -98,7 +82,6 @@ public abstract class MerchantMenuMixin {
         ItemStack candidate = returned.copy();
 
         if (!custominventory$insertFully(working, candidate)) {
-            // Preserve vanilla's drop behavior only when hotbar + every virtual page are genuinely full.
             inventory.placeItemBackInInventory(returned);
             return;
         }
@@ -109,14 +92,11 @@ public abstract class MerchantMenuMixin {
         CustomHotbarInventory.sendHiddenRecipeState(player);
     }
 
-    /** hotbar (9) followed by page 1..8 (8 x 27). */
     @Unique
     private static List<ItemStack> custominventory$snapshotVirtualInventory(ServerPlayer player) {
         ArrayList<ItemStack> out = new ArrayList<>(9 + InventoryStorage.PAGE_COUNT * InventoryStorage.PAGE_SIZE);
         for (int slot = 0; slot < 9; slot++) out.add(player.getInventory().getItem(slot).copy());
-        for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
-            for (ItemStack stack : InventoryStorage.read(player, page)) out.add(stack.copy());
-        }
+        for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) out.addAll(InventoryStorage.read(player, page));
         return out;
     }
 
@@ -135,7 +115,7 @@ public abstract class MerchantMenuMixin {
         for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
             ArrayList<ItemStack> pageStacks = new ArrayList<>(InventoryStorage.PAGE_SIZE);
             for (int index = 0; index < InventoryStorage.PAGE_SIZE; index++) {
-                pageStacks.add(working.get(offset + page * InventoryStorage.PAGE_SIZE + index).copy());
+                pageStacks.add(working.get(offset + page * InventoryStorage.PAGE_SIZE + index));
             }
             if (page == activePage) InventoryStorage.loadLive(player, pageStacks);
             else InventoryStorage.write(player, page, pageStacks);
@@ -143,11 +123,9 @@ public abstract class MerchantMenuMixin {
         InventoryStorage.snapshotLive(player);
     }
 
-    /** Simulates Inventory.placeItemBackInInventory semantics without touching live state. */
     @Unique
     private static boolean custominventory$insertFully(List<ItemStack> slots, ItemStack incoming) {
         if (incoming.isEmpty()) return true;
-
         for (ItemStack existing : slots) {
             if (existing.isEmpty() || !ItemStack.isSameItemSameComponents(existing, incoming)) continue;
             int space = existing.getMaxStackSize() - existing.getCount();
@@ -167,7 +145,6 @@ public abstract class MerchantMenuMixin {
         return false;
     }
 
-    /** Extract exactly the required amount from one component-compatible variant for preflight. */
     @Unique
     private static ItemStack custominventory$extractExact(List<ItemStack> slots, ItemCost cost, int required) {
         if (required <= 0) return ItemStack.EMPTY;
@@ -181,7 +158,6 @@ public abstract class MerchantMenuMixin {
         if (required <= 0) return ItemStack.EMPTY;
         ItemStack representative = custominventory$findSatisfyingVariant(slots, cost, required);
         if (representative == null) return null;
-
         int available = custominventory$countVariant(slots, cost, representative);
         int move = Math.min(representative.getMaxStackSize(), available);
         if (move < required) return null;
@@ -202,16 +178,13 @@ public abstract class MerchantMenuMixin {
         int total = 0;
         for (ItemStack stack : slots) {
             if (!stack.isEmpty() && cost.test(stack)
-                    && ItemStack.isSameItemSameComponents(representative, stack)) {
-                total += stack.getCount();
-            }
+                    && ItemStack.isSameItemSameComponents(representative, stack)) total += stack.getCount();
         }
         return total;
     }
 
     @Unique
-    private static ItemStack custominventory$extractVariant(
-            List<ItemStack> slots, ItemCost cost, ItemStack representative, int amount) {
+    private static ItemStack custominventory$extractVariant(List<ItemStack> slots, ItemCost cost, ItemStack representative, int amount) {
         int remaining = amount;
         for (int i = 0; i < slots.size() && remaining > 0; i++) {
             ItemStack stack = slots.get(i);
