@@ -11,6 +11,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /** Server-authoritative storage for eight 27-slot inventory pages plus one alternate hotbar. */
 public final class InventoryStorage {
@@ -98,6 +99,16 @@ public final class InventoryStorage {
         return normalizedCopy(target(player).getAttachedOrElse(PAGES[page], List.of()), PAGE_SIZE);
     }
 
+    static void forEachStoredStack(ServerPlayer player, int page, Consumer<ItemStack> consumer) {
+        validatePage(page);
+        List<ItemStack> stored = target(player).getAttachedOrElse(PAGES[page], List.of());
+        int limit = Math.min(PAGE_SIZE, stored.size());
+        for (int i = 0; i < limit; i++) {
+            ItemStack stack = stored.get(i);
+            if (stack != null) consumer.accept(stack);
+        }
+    }
+
     public static void write(ServerPlayer player, int page, List<ItemStack> stacks) {
         validatePage(page);
         target(player).setAttached(PAGES[page], List.copyOf(normalizedCopy(stacks, PAGE_SIZE)));
@@ -116,24 +127,13 @@ public final class InventoryStorage {
 
     public static void switchPage(ServerPlayer player, int targetPage) {
         validatePage(targetPage);
-
-        // Treat a page transition as one server-authoritative transaction. The item currently
-        // carried by the menu is not part of any inventory page; it must survive while the 27
-        // materialized page slots are replaced underneath the open screen.
         ItemStack carried = player.containerMenu.getCarried().copy();
         int current = active(player);
         List<ItemStack> currentLive = liveCopy(player);
         List<ItemStack> next = current == targetPage ? currentLive : read(player, targetPage);
-
-        // Snapshot the source page after the preceding slot-click has removed the carried item,
-        // then materialize the destination page. This prevents the source slot from being restored
-        // during the same transition.
         write(player, current, currentLive);
         loadLive(player, next);
         target(player).setAttached(ACTIVE_PAGE, targetPage);
-
-        // Reassert the carried item before AND after the menu resync. This explicitly guarantees:
-        // pick item -> switch page -> same item remains on cursor -> place it on destination page.
         player.containerMenu.setCarried(carried.copy());
         sync(player);
         player.containerMenu.setCarried(carried);
@@ -155,9 +155,7 @@ public final class InventoryStorage {
 
     private static boolean hasEmptyLiveSlot(ServerPlayer player) {
         Inventory inv = player.getInventory();
-        for (int i = 0; i < PAGE_SIZE; i++) {
-            if (inv.getItem(MAIN_START + i).isEmpty()) return true;
-        }
+        for (int i = 0; i < PAGE_SIZE; i++) if (inv.getItem(MAIN_START + i).isEmpty()) return true;
         return false;
     }
 
