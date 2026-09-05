@@ -11,6 +11,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import org.slf4j.Logger;
@@ -25,11 +26,12 @@ public final class CustomPickaxeMod implements ModInitializer {
         UseItemCallback.EVENT.register((player, level, hand) -> {
             if (level.isClientSide() || !player.isShiftKeyDown()) return InteractionResult.PASS;
             ItemStack stack = player.getItemInHand(hand);
-            if (!PickaxeIdentity.isRemotePickaxe(stack) || !(player instanceof ServerPlayer serverPlayer)) {
+            if (!stack.is(Items.IRON_PICKAXE) || !(player instanceof ServerPlayer serverPlayer)) {
                 return InteractionResult.PASS;
             }
-
             String type = PickaxeIdentity.type(stack);
+            if (type.isEmpty()) return InteractionResult.PASS;
+
             int miningLevel = GlobalPickaxeState.cycle(serverPlayer.getUUID(), type);
             Component status = switch (miningLevel) {
                 case GlobalPickaxeState.LEVEL_1 -> Component.literal("Pickaxe: L1 8x8")
@@ -49,9 +51,11 @@ public final class CustomPickaxeMod implements ModInitializer {
         PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) -> {
             if (!(level instanceof ServerLevel) || !(player instanceof ServerPlayer serverPlayer)) return;
             ItemStack stack = serverPlayer.getMainHandItem();
+            if (!stack.is(Items.IRON_PICKAXE)) return;
             String type = PickaxeIdentity.type(stack);
+            if (type.isEmpty()) return;
             int miningLevel = GlobalPickaxeState.level(serverPlayer.getUUID());
-            if (!PickaxeIdentity.isRemotePickaxe(stack) || miningLevel == GlobalPickaxeState.OFF
+            if (miningLevel == GlobalPickaxeState.OFF
                     || !RemoteMiningManager.isSupportedType(type) || isOreLikeResource(state)) return;
             RemoteMiningManager.start(serverPlayer, pos, type, GlobalPickaxeState.sideForLevel(miningLevel, type));
         });
