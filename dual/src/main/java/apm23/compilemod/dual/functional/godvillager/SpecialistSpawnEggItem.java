@@ -33,16 +33,18 @@ public final class SpecialistSpawnEggItem extends Item {
     private static final String CLERK_PHANTOM_EMERALD = simpleTrade("phantom_membrane", 1, "emerald", 1);
     private static final String CLERK_PHANTOM_BOOK = simpleTrade("phantom_membrane", 1, "book", 1);
 
-    private final String summonSuffix;
+    private final String summonEntity;
+    private final String summonNbt;
 
     public SpecialistSpawnEggItem(Properties properties, String summonSuffix) {
         super(properties);
-        this.summonSuffix = enhance(summonSuffix);
+        String enhanced = enhance(summonSuffix);
+        int split = enhanced.indexOf(' ');
+        this.summonEntity = split < 0 ? enhanced : enhanced.substring(0, split);
+        this.summonNbt = split < 0 ? "" : enhanced.substring(split + 1);
     }
 
-    private static int discountedBookPrice(int value) {
-        return Math.max(1, Math.round(value * 0.8f));
-    }
+    private static int discountedBookPrice(int value) { return Math.max(1, Math.round(value * 0.8f)); }
 
     private static String bookTrade(String name, String enchantmentId, int level, int emeralds) {
         return "{buy:{id:emerald,count:" + discountedBookPrice(emeralds) + "},buyB:{id:book,count:1},sell:{id:enchanted_book,count:1,components:{custom_name:{text:\"" + name + "\",color:\"gold\",italic:false},stored_enchantments:{\"" + enchantmentId + "\":" + level + "}}},maxUses:999999,rewardExp:0b,priceMultiplier:0f}";
@@ -57,7 +59,6 @@ public final class SpecialistSpawnEggItem extends Item {
             .replace("CustomNameVisible:1b,Glowing:1b,", "CustomNameVisible:0b,Glowing:0b,")
             .replace("Glowing:1b,", "Glowing:0b,")
             .replace("CustomNameVisible:1b,", "CustomNameVisible:0b,");
-
         if (result.contains("Tool Sage")) result = appendTrade(result, GOD_FISHING_ROD_BOOK);
         if (result.contains("Arms Sage")) {
             result = appendTrade(result, GOD_SHIELD_BOOK);
@@ -66,13 +67,11 @@ public final class SpecialistSpawnEggItem extends Item {
             result = appendTrade(result, LIFE_STEAL_II_BOOK);
             result = appendTrade(result, LIFE_STEAL_III_BOOK);
         }
-
         if (isLootSpecialist(result)) {
             result = appendTrade(result, LOOTING_III_BOOK);
             result = appendTrade(result, LOOTING_IV_BOOK);
             result = appendTrade(result, LOOTING_V_BOOK);
         }
-
         if (isClerkSpecialist(result)) {
             result = removeTradesBuying(result, "string", "arrow");
             result = appendTrade(result, CLERK_STRING);
@@ -85,7 +84,6 @@ public final class SpecialistSpawnEggItem extends Item {
             result = appendTrade(result, CLERK_PHANTOM_EMERALD);
             result = appendTrade(result, CLERK_PHANTOM_BOOK);
         }
-
         return booksFirst(result);
     }
 
@@ -115,10 +113,7 @@ public final class SpecialistSpawnEggItem extends Item {
             String compact = recipe.replace(" ", "").replace("\"minecraft:", "\"");
             boolean remove = false;
             for (String id : itemIds) {
-                if (compact.contains("buy:{id:" + id + ",") || compact.contains("buy:{id:\"" + id + "\",")) {
-                    remove = true;
-                    break;
-                }
+                if (compact.contains("buy:{id:" + id + ",") || compact.contains("buy:{id:\"" + id + "\",")) { remove = true; break; }
             }
             if (!remove) kept.add(recipe);
         }
@@ -136,9 +131,7 @@ public final class SpecialistSpawnEggItem extends Item {
         if (recipes.size() < 2) return command;
         List<String> books = new ArrayList<>();
         List<String> other = new ArrayList<>();
-        for (String recipe : recipes) {
-            if (isEnchantedBookTrade(recipe)) books.add(recipe); else other.add(recipe);
-        }
+        for (String recipe : recipes) { if (isEnchantedBookTrade(recipe)) books.add(recipe); else other.add(recipe); }
         if (books.isEmpty() || other.isEmpty()) return command;
         List<String> ordered = new ArrayList<>(recipes.size());
         ordered.addAll(books);
@@ -192,11 +185,8 @@ public final class SpecialistSpawnEggItem extends Item {
         BlockPos spawnPos = context.getClickedPos().relative(context.getClickedFace());
         Vec3 pos = new Vec3(spawnPos.getX() + 0.5D, spawnPos.getY(), spawnPos.getZ() + 0.5D);
         CommandSourceStack source = serverLevel.getServer().createCommandSourceStack().withLevel(serverLevel).withPosition(pos).withSuppressedOutput();
-        int split = summonSuffix.indexOf(' ');
-        String entity = split < 0 ? summonSuffix : summonSuffix.substring(0, split);
-        String nbt = split < 0 ? "" : summonSuffix.substring(split + 1);
-        String command = "summon " + entity + " " + spawnPos.getX() + " " + spawnPos.getY() + " " + spawnPos.getZ();
-        if (!nbt.isEmpty()) command += " " + nbt;
+        String command = "summon " + summonEntity + " " + spawnPos.getX() + " " + spawnPos.getY() + " " + spawnPos.getZ();
+        if (!summonNbt.isEmpty()) command += " " + summonNbt;
         serverLevel.getServer().getCommands().performPrefixedCommand(source, command);
         return InteractionResult.SUCCESS;
     }
