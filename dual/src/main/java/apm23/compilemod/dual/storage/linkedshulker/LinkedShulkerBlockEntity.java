@@ -29,19 +29,19 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
     private String channel = "default";
     private String channelLabel = "default";
     private final NonNullList<ItemStack> fallback = NonNullList.withSize(ChannelStorageData.SIZE, ItemStack.EMPTY);
+    private @Nullable NonNullList<ItemStack> serverItemsCache;
     private int viewers = 0;
     private int animationFrame = 0;
 
     public LinkedShulkerBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.LINKED_SHULKER, pos, state);
-        if (state.hasProperty(LinkedShulkerBlock.OPEN_FRAME)) {
-            animationFrame = state.getValue(LinkedShulkerBlock.OPEN_FRAME);
-        }
+        if (state.hasProperty(LinkedShulkerBlock.OPEN_FRAME)) animationFrame = state.getValue(LinkedShulkerBlock.OPEN_FRAME);
     }
 
     public void setChannel(String rawName) {
         this.channelLabel = ChannelStorageData.displayName(rawName);
         this.channel = ChannelStorageData.normalize(rawName);
+        this.serverItemsCache = null;
         setChanged();
     }
 
@@ -49,7 +49,14 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
     public String channelLabel() { return channelLabel; }
 
     private NonNullList<ItemStack> items() {
-        if (level instanceof ServerLevel serverLevel) return ChannelStorageData.get(serverLevel.getServer()).inventory(channel);
+        if (level instanceof ServerLevel serverLevel) {
+            NonNullList<ItemStack> cached = serverItemsCache;
+            if (cached == null) {
+                cached = ChannelStorageData.get(serverLevel.getServer()).inventory(channel);
+                serverItemsCache = cached;
+            }
+            return cached;
+        }
         return fallback;
     }
 
@@ -109,11 +116,6 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
         if (level.isClientSide()) return;
         int target = be.viewers > 0 ? LinkedShulkerBlock.MAX_OPEN_FRAME : 0;
         if (be.animationFrame == target) return;
-
-        // Do not cycle through block-model states every server tick. Each setBlock invalidates the
-        // chunk render section, which made the whole custom shulker visibly blink/flicker while
-        // opening and closing. Keep only stable CLOSED / OPEN blockstates so the model is rebuilt
-        // once per transition instead of seven consecutive times.
         boolean opening = target > be.animationFrame;
         be.animationFrame = target;
 
@@ -157,5 +159,6 @@ public final class LinkedShulkerBlockEntity extends BlockEntity implements Conta
         String savedLabel = input.read("channel_label", Codec.STRING).orElse(savedChannel);
         channelLabel = ChannelStorageData.displayName(savedLabel);
         channel = ChannelStorageData.normalize(channelLabel);
+        serverItemsCache = null;
     }
 }
