@@ -45,7 +45,7 @@ public final class LinkedShulkerClientGameTest implements FabricClientGameTest {
 
                 assertTrue(GodVillagerRegistry.GOD_TOOLS_EGG instanceof SpecialistSpawnEggItem,
                         "God Tools specialist egg is not registered as the runtime spawn item");
-                String toolsSummon = summonSuffix((SpecialistSpawnEggItem) GodVillagerRegistry.GOD_TOOLS_EGG);
+                String toolsSummon = summonPayload((SpecialistSpawnEggItem) GodVillagerRegistry.GOD_TOOLS_EGG);
                 assertTrue(toolsSummon.contains("God Fishing Rod"), "God Fishing Rod trade is missing from Tool Sage");
                 assertTrue(toolsSummon.contains("luck_of_the_sea:25,lure:5,unbreaking:3,mending:2"),
                         "God Fishing Rod enchant payload drifted: " + toolsSummon);
@@ -116,11 +116,15 @@ public final class LinkedShulkerClientGameTest implements FabricClientGameTest {
         }
     }
 
-    private static String summonSuffix(SpecialistSpawnEggItem item) {
+    private static String summonPayload(SpecialistSpawnEggItem item) {
         try {
-            Field field = SpecialistSpawnEggItem.class.getDeclaredField("summonSuffix");
-            field.setAccessible(true);
-            return (String) field.get(item);
+            Field entityField = SpecialistSpawnEggItem.class.getDeclaredField("summonEntity");
+            Field nbtField = SpecialistSpawnEggItem.class.getDeclaredField("summonNbt");
+            entityField.setAccessible(true);
+            nbtField.setAccessible(true);
+            String entity = (String) entityField.get(item);
+            String nbt = (String) nbtField.get(item);
+            return nbt == null || nbt.isEmpty() ? entity : entity + " " + nbt;
         } catch (ReflectiveOperationException exception) {
             throw new AssertionError("could not inspect specialist summon payload", exception);
         }
