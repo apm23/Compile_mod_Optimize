@@ -8,7 +8,6 @@ import net.minecraft.world.item.crafting.Ingredient;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.List;
 
 /** Client-side TACZ workbench ingredient accounting across all paged inventory slots. */
@@ -30,10 +29,7 @@ public final class TaczCraftingClientBridge {
             @SuppressWarnings("unchecked")
             List<Object> ingredients = (List<Object>) recipe.getClass().getMethod("getInputs").invoke(recipe);
             Int2IntArrayMap counts = new Int2IntArrayMap(ingredients.size());
-
-            ArrayList<ItemStack> all = new ArrayList<>();
-            for (ItemStack stack : player.getInventory().getNonEquipmentItems()) all.add(stack);
-            all.addAll(HiddenRecipeContentsClient.snapshot());
+            List<ItemStack> hidden = HiddenRecipeContentsClient.view();
 
             for (int i = 0; i < ingredients.size(); i++) {
                 Object input = ingredients.get(i);
@@ -41,7 +37,10 @@ public final class TaczCraftingClientBridge {
                 Ingredient ingredient = (Ingredient) getIngredient.invoke(input);
                 int count = 0;
                 if (ingredient != null) {
-                    for (ItemStack stack : all) {
+                    for (ItemStack stack : player.getInventory().getNonEquipmentItems()) {
+                        if (stack != null && !stack.isEmpty() && ingredient.test(stack)) count += stack.getCount();
+                    }
+                    for (ItemStack stack : hidden) {
                         if (stack != null && !stack.isEmpty() && ingredient.test(stack)) count += stack.getCount();
                     }
                 }
