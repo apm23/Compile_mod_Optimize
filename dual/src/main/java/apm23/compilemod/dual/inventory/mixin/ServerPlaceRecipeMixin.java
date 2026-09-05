@@ -41,15 +41,10 @@ public abstract class ServerPlaceRecipeMixin {
         int active = InventoryStorage.active(player);
         for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
             if (page == active) continue;
-            for (ItemStack stack : InventoryStorage.read(player, page)) contents.accountSimpleStack(stack);
+            InventoryStorage.forEachStoredStack(player, page, contents::accountSimpleStack);
         }
     }
 
-    /**
-     * Vanilla only checks the 36 materialized inventory slots before it clears the crafting grid.
-     * With paged storage that can incorrectly reject every recipe click while hidden pages still
-     * have room. If vanilla says no, retry the capacity check against the unified paged inventory.
-     */
     @Inject(method = "testClearGrid", at = @At("RETURN"), cancellable = true)
     private void custominventory$allowClearIntoHiddenPages(CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValueZ()) return;
@@ -57,10 +52,6 @@ public abstract class ServerPlaceRecipeMixin {
         if (custominventory$canFitCraftGridAcrossPages(player)) cir.setReturnValue(true);
     }
 
-    /**
-     * Keep vanilla's normal active-inventory insertion first. If it leaves a remainder, store that
-     * remainder in hidden pages instead of letting the paged inventory look artificially full.
-     */
     @Redirect(
         method = "clearGrid",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/player/Inventory;placeItemBackInInventory(Lnet/minecraft/world/item/ItemStack;Z)V")
@@ -80,7 +71,7 @@ public abstract class ServerPlaceRecipeMixin {
         int active = InventoryStorage.active(player);
         for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
             if (page == active) continue;
-            List<ItemStack> stored = new ArrayList<>(InventoryStorage.read(player, page));
+            List<ItemStack> stored = InventoryStorage.read(player, page);
             for (int slot = 0; slot < stored.size(); slot++) {
                 ItemStack candidate = stored.get(slot);
                 if (candidate.isEmpty() || !candidate.is(item) || !Inventory.isUsableForCrafting(candidate)) continue;
@@ -119,7 +110,7 @@ public abstract class ServerPlaceRecipeMixin {
         int active = InventoryStorage.active(player);
         for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
             if (page == active) continue;
-            for (ItemStack stack : InventoryStorage.read(player, page)) simulated.add(stack.copy());
+            simulated.addAll(InventoryStorage.read(player, page));
         }
 
         for (Slot slot : this.slotsToClear) {
@@ -158,10 +149,9 @@ public abstract class ServerPlaceRecipeMixin {
         int active = InventoryStorage.active(player);
         boolean changed = false;
 
-        // Merge first so clearing a crafting grid does not waste empty page slots.
         for (int page = 0; page < InventoryStorage.PAGE_COUNT && !incoming.isEmpty(); page++) {
             if (page == active) continue;
-            List<ItemStack> stored = new ArrayList<>(InventoryStorage.read(player, page));
+            List<ItemStack> stored = InventoryStorage.read(player, page);
             boolean pageChanged = false;
             for (int slot = 0; slot < stored.size() && !incoming.isEmpty(); slot++) {
                 ItemStack existing = stored.get(slot);
@@ -181,7 +171,7 @@ public abstract class ServerPlaceRecipeMixin {
 
         for (int page = 0; page < InventoryStorage.PAGE_COUNT && !incoming.isEmpty(); page++) {
             if (page == active) continue;
-            List<ItemStack> stored = new ArrayList<>(InventoryStorage.read(player, page));
+            List<ItemStack> stored = InventoryStorage.read(player, page);
             boolean pageChanged = false;
             for (int slot = 0; slot < stored.size() && !incoming.isEmpty(); slot++) {
                 if (!stored.get(slot).isEmpty()) continue;
