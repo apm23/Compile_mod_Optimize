@@ -21,6 +21,8 @@ public final class TaczAmmoCompat {
     private static final String AMMO = "com.tacz.guns.api.item.IAmmo";
     private static final String AMMO_BOX = "com.tacz.guns.api.item.IAmmoBox";
     private static final String DEFAULT_ASSETS = "com.tacz.guns.api.DefaultAssets";
+    private static volatile Method hiddenViewMethod;
+    private static volatile boolean hiddenViewResolved;
 
     private TaczAmmoCompat() {}
 
@@ -46,9 +48,9 @@ public final class TaczAmmoCompat {
                     if (!(args[0] instanceof Player player)) return false;
                     ItemStack gun = (ItemStack) args[1];
                     if (player instanceof ServerPlayer sp) {
-                        return hasCompatible(new ServerAmmoView(sp), gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount);
+                        return hasCompatibleServer(sp, gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount);
                     }
-                    return hasCompatible(clientSnapshot(player), gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount);
+                    return hasCompatibleClient(player, gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount);
                 }
                 if (name.equals("consumeAmmo")) {
                     if (!(args[0] instanceof ServerPlayer player)) return 0;
@@ -103,17 +105,58 @@ public final class TaczAmmoCompat {
         }
     }
 
-    private static boolean hasCompatible(ServerAmmoView view, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass, Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
-        for (int slot = 0; slot < view.size(); slot++) {
-            ItemStack stack = view.get(slot);
+    private static boolean hasCompatibleServer(ServerPlayer player, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass,
+                                               Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
+        for (int slot = 0; slot < 9; slot++) {
+            if (isCompatible(player.getInventory().getItem(slot), gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount)) return true;
+        }
+        int active = InventoryStorage.active(player);
+        for (int slot = 0; slot < InventoryStorage.PAGE_SIZE; slot++) {
+            if (isCompatible(player.getInventory().getItem(InventoryStorage.MAIN_START + slot), gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount)) return true;
+        }
+        for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) {
+            if (page == active) continue;
+            for (int slot = 0; slot < InventoryStorage.PAGE_SIZE; slot++) {
+                if (isCompatible(InventoryStorage.peekStoredStack(player, page, slot), gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasCompatibleClient(Player player, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass,
+                                               Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
+        for (int slot = 0; slot < 36; slot++) {
+            if (isCompatible(player.getInventory().getItem(slot), gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount)) return true;
+        }
+        for (ItemStack stack : hiddenClientView()) {
             if (isCompatible(stack, gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount)) return true;
         }
         return false;
     }
 
-    private static boolean hasCompatible(List<ItemStack> stacks, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass, Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
-        for (ItemStack stack : stacks) if (isCompatible(stack, gun, ammoClass, ammoBoxClass, ammoMatches, boxMatches, boxCount)) return true;
-        return false;
+    @SuppressWarnings("unchecked")
+    private static List<ItemStack> hiddenClientView() {
+        Method method = hiddenViewMethod;
+        if (!hiddenViewResolved) {
+            synchronized (TaczAmmoCompat.class) {
+                if (!hiddenViewResolved) {
+                    try {
+                        method = Class.forName("com.anjas.custominventory.client.HiddenRecipeContentsClient").getMethod("view");
+                        hiddenViewMethod = method;
+                    } catch (ReflectiveOperationException | LinkageError ignored) {
+                        hiddenViewMethod = null;
+                    }
+                    hiddenViewResolved = true;
+                } else method = hiddenViewMethod;
+            }
+        }
+        if (method == null) return List.of();
+        try {
+            Object value = method.invoke(null);
+            return value instanceof List<?> list ? (List<ItemStack>) list : List.of();
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return List.of();
+        }
     }
 
     private static boolean isCompatible(ItemStack stack, ItemStack gun, Class<?> ammoClass, Class<?> ammoBoxClass, Method ammoMatches, Method boxMatches, Method boxCount) throws ReflectiveOperationException {
@@ -124,24 +167,15 @@ public final class TaczAmmoCompat {
                 && ((Number) boxCount.invoke(item, stack)).intValue() > 0;
     }
 
-    private static List<ItemStack> clientSnapshot(Player player) {
-        ArrayList<ItemStack> all = new ArrayList<>();
-        for (int i = 0; i < 36; i++) all.add(player.getInventory().getItem(i));
-        try {
-            Class<?> cache = Class.forName("com.anjas.custominventory.client.HiddenRecipeContentsClient");
-            @SuppressWarnings("unchecked") List<ItemStack> hidden = (List<ItemStack>) cache.getMethod("view").invoke(null);
-            all.addAll(hidden);
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        return all;
-    }
-
     private static final class ServerAmmoView {
         private final ServerPlayer player;
         private final int activePage;
         private final List<List<ItemStack>> pages = new ArrayList<>(InventoryStorage.PAGE_COUNT);
         private boolean mutated;
         private ServerAmmoView(ServerPlayer player) {
-            this.player = player; InventoryStorage.snapshotLive(player); this.activePage = InventoryStorage.active(player);
+            this.player = player;
+            InventoryStorage.snapshotLive(player);
+            this.activePage = InventoryStorage.active(player);
             for (int page = 0; page < InventoryStorage.PAGE_COUNT; page++) pages.add(new ArrayList<>(InventoryStorage.read(player, page)));
         }
         private int size() { return 9 + InventoryStorage.PAGE_COUNT * InventoryStorage.PAGE_SIZE; }
