@@ -11,6 +11,15 @@ final class MultiPageInventoryCompat {
     private static final String STORAGE_CLASS = "com.anjas.custominventory.InventoryStorage";
     private static volatile boolean resolved;
     private static volatile Access access;
+    private static final SlotOps<ItemStack> ITEM_STACK_OPS = new SlotOps<>() {
+        public boolean empty(ItemStack s) { return s == null || s.isEmpty(); }
+        public boolean same(ItemStack a, ItemStack b) { return ItemStack.isSameItemSameComponents(a, b); }
+        public int count(ItemStack s) { return s.getCount(); }
+        public int max(ItemStack s) { return s.getMaxStackSize(); }
+        public void grow(ItemStack s, int n) { s.grow(n); }
+        public void shrink(ItemStack s, int n) { s.shrink(n); }
+        public ItemStack copyWithCount(ItemStack s, int n) { ItemStack c = s.copy(); c.setCount(n); return c; }
+    };
 
     private MultiPageInventoryCompat() {}
 
@@ -21,33 +30,34 @@ final class MultiPageInventoryCompat {
         try {
             api.snapshotLive.invoke(null, player);
             int activePage = (Integer) api.active.invoke(null, player);
+            boolean changed = false;
             for (int page = 0; page < api.pageCount && !remaining.isEmpty(); page++) {
                 if (page == activePage) continue;
                 List<ItemStack> slots = mutableCopy(api.read.invoke(null, player, page), api.pageSize);
+                int before = remaining.getCount();
                 insertInto(slots, remaining);
-                api.write.invoke(null, player, page, slots);
+                if (remaining.getCount() != before) {
+                    api.write.invoke(null, player, page, slots);
+                    changed = true;
+                }
             }
             if (!remaining.isEmpty()) {
                 List<ItemStack> hotbar = mutableCopy(api.readAltHotbar.invoke(null, player), 9);
+                int before = remaining.getCount();
                 insertInto(hotbar, remaining);
-                api.writeAltHotbar.invoke(null, player, hotbar);
+                if (remaining.getCount() != before) {
+                    api.writeAltHotbar.invoke(null, player, hotbar);
+                    changed = true;
+                }
             }
-            api.sync.invoke(null, player);
+            if (changed) api.sync.invoke(null, player);
         } catch (ReflectiveOperationException | RuntimeException error) {
             CustomPickaxeMod.LOGGER.warn("Could not route mining overflow into multi-page inventory; falling back to world drop", error);
         }
     }
 
     static void insertInto(List<ItemStack> slots, ItemStack remaining) {
-        insertGeneric(slots, remaining, new SlotOps<>() {
-            public boolean empty(ItemStack s) { return s == null || s.isEmpty(); }
-            public boolean same(ItemStack a, ItemStack b) { return ItemStack.isSameItemSameComponents(a, b); }
-            public int count(ItemStack s) { return s.getCount(); }
-            public int max(ItemStack s) { return s.getMaxStackSize(); }
-            public void grow(ItemStack s, int n) { s.grow(n); }
-            public void shrink(ItemStack s, int n) { s.shrink(n); }
-            public ItemStack copyWithCount(ItemStack s, int n) { ItemStack c = s.copy(); c.setCount(n); return c; }
-        });
+        insertGeneric(slots, remaining, ITEM_STACK_OPS);
     }
 
     static <T> void insertGeneric(List<T> slots, T remaining, SlotOps<T> ops) {
