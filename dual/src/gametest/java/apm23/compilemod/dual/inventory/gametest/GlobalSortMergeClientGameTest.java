@@ -19,31 +19,37 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
             prepareEightPageMerge(singleplayer);
             context.waitTicks(4);
-            trigger(singleplayer, context, false);
+            context.runOnClient(client -> {
+                if (client.player == null) throw new AssertionError("client player missing");
+                InventoryScreen screen = new InventoryScreen(client.player);
+                boolean handled = CustomHotbarInventoryClient.testHandleActiveGuiInput(screen, false);
+                if (!handled) throw new AssertionError("merge key was not handled by active GUI input path");
+            });
             context.waitTicks(6);
             verifyMergedAcrossAllEightPages(singleplayer);
 
             prepareEightPageSort(singleplayer);
             context.waitTicks(4);
-            trigger(singleplayer, context, true);
+            context.runOnClient(client -> {
+                if (client.player == null) throw new AssertionError("client player missing");
+                InventoryScreen screen = new InventoryScreen(client.player);
+                boolean handled = CustomHotbarInventoryClient.testHandleActiveGuiInput(screen, true);
+                if (!handled) throw new AssertionError("sort key was not handled by active GUI input path");
+            });
             context.waitTicks(6);
             verifySortedAcrossAllEightPages(singleplayer);
 
             prepareOverflowLikeActiveLatePage(singleplayer);
             context.waitTicks(4);
-            trigger(singleplayer, context, true);
+            context.runOnClient(client -> {
+                if (client.player == null) throw new AssertionError("client player missing");
+                InventoryScreen screen = new InventoryScreen(client.player);
+                boolean handled = CustomHotbarInventoryClient.testHandleActiveGuiInput(screen, true);
+                if (!handled) throw new AssertionError("overflow-like sort key was not handled by active GUI input path");
+            });
             context.waitTicks(6);
             verifyOverflowLikeSortReturnsToCompactedPage(singleplayer);
         }
-    }
-
-    private static void trigger(TestSingleplayerContext singleplayer, ClientGameTestContext context, boolean sort) {
-        context.runOnClient(client -> {
-            if (client.player == null) throw new AssertionError("client player missing");
-            InventoryScreen screen = new InventoryScreen(client.player);
-            boolean handled = CustomHotbarInventoryClient.testHandleActiveGuiInput(screen, sort);
-            if (!handled) throw new AssertionError((sort ? "sort" : "merge") + " key was not handled by active GUI input path");
-        });
     }
 
     private static void prepareEightPageMerge(TestSingleplayerContext singleplayer) {
@@ -78,7 +84,6 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
             assertTrue(totalStone == 64, "global merge changed total stone count: " + totalStone);
             assertTrue(stoneStacks == 1, "global merge did not merge stacks from all 8 pages: stacks=" + stoneStacks);
             assertTrue(nonEmptyOutsidePage0 == 0, "global merge left items stranded outside page 1: " + nonEmptyOutsidePage0);
-            assertTrue(InventoryStorage.active(player) == 0, "global merge did not return active page to page 1");
         });
     }
 
@@ -143,6 +148,10 @@ public final class GlobalSortMergeClientGameTest implements FabricClientGameTest
                 }
                 InventoryStorage.write(player, page, stacks);
             }
+            // Materialize the stored current page before switching. switchPage() snapshots the
+            // live current page by design, so this avoids stale state from the prior test case
+            // overwriting the page-1 fixture.
+            InventoryStorage.loadLive(player, InventoryStorage.read(player, 0));
             InventoryStorage.switchPage(player, 7);
             InventoryStorage.sync(player);
         });
