@@ -5,10 +5,10 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.core.BlockPos;
-import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.equine.SkeletonHorse;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.lang.reflect.Method;
 
@@ -23,7 +23,7 @@ public final class GodHorseFocusedClientGameTest implements FabricClientGameTest
 
                 var source = server.createCommandSourceStack()
                         .withLevel(level)
-                        .withPosition(pos.getCenter())
+                        .withPosition(new Vec3(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D))
                         .withSuppressedOutput();
                 int result = server.getCommands().performPrefixedCommand(source,
                         "summon minecraft:skeleton_horse 8 100 8 {Tame:1b,Temper:100,PersistenceRequired:1b,Tags:[\"godvillagers_god_horse\"]}");
