@@ -144,6 +144,17 @@ public final class InventoryStorage {
         player.containerMenu.setCarried(carried);
     }
 
+    /** Use only after all stored pages have already been rewritten atomically. */
+    public static void activateStoredPageAfterRewrite(ServerPlayer player, int page) {
+        validatePage(page);
+        ItemStack carried = player.containerMenu.getCarried().copy();
+        loadLive(player, read(player, page));
+        target(player).setAttached(ACTIVE_PAGE, page);
+        player.containerMenu.setCarried(carried.copy());
+        sync(player);
+        player.containerMenu.setCarried(carried);
+    }
+
     public static void cycle(ServerPlayer player) { switchPage(player, (active(player) + 1) % PAGE_COUNT); }
     public static void routeOverflow(ServerPlayer player) { routeOverflowAndReport(player); }
 
